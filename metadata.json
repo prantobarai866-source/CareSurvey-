@@ -1,0 +1,6 @@
+{
+  "name": "Speed Tycoon 3D — হাইওয়ে কার রেসার ও ইন-গেম শপ",
+  "description": "3D হাইওয়ে কার রেসিং ও টাইকুন শপ। হাইওয়েতে টাকা ইনকাম করে নতুন সুপারকার, এক্সক্লুসিভ রাস্তা ও পরিবেশ, ক্যাশ ম্যাগনেট গ্যাজেট এবং পারফরম্যান্স আপগ্রেড কিনুন!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

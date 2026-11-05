@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Speed Tycoon 3D — হাইওয়ে কার রেসার ও ইন-গেম শপ</title>
+
+  <!-- Tailwind CSS, Three.js & Confetti CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;600;700&family=Hind+Siliguri:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #02050f;
+      color: #ffffff;
+      font-family: 'Hind Siliguri', 'Rajdhani', sans-serif;
+      touch-action: none;
+    }
+
+    .font-cyber {
+      font-family: 'Orbitron', monospace;
+    }
+
+    canvas#game {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    #ui {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .pointer-auto {
+      pointer-events: auto;
+    }
+
+    .panel {
+      background: rgba(3, 6, 23, 0.92);
+      border: 1px solid rgba(0, 234, 255, 0.4);
+      box-shadow: 0 0 35px rgba(0, 234, 255, 0.15), inset 0 0 25px rgba(0, 230, 118, 0.05);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .neon-cyan {
+      text-shadow: 0 0 8px #00f0ff, 0 0 20px #00f0ff, 0 0 40px rgba(0, 240, 255, 0.4);
+    }
+
+    .neon-green {
+      text-shadow: 0 0 8px #00e676, 0 0 20px #00e676, 0 0 40px rgba(0, 230, 118, 0.5);
+    }
+
+    .crt-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0.2;
+      background: linear-gradient(rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.4) 50%);
+      background-size: 100% 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="game"></canvas>
+  <div class="crt-overlay"></div>
+
+  <div id="ui">
+    <!-- IN-GAME HUD -->
+    <div id="hud" class="hidden absolute top-3 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl flex flex-col gap-2">
+      <div class="panel rounded-2xl px-4 py-2.5 flex justify-between items-center gap-3">
+        <!-- Speedometer -->
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-cyan-950/80 border border-cyan-400/50 flex items-center justify-center text-cyan-400 font-cyber font-bold text-lg">
+            ⚡
+          </div>
+          <div>
+            <div class="text-[9px] text-cyan-400 font-cyber tracking-widest uppercase">গতি / SPEED</div>
+            <div id="hudSpeed" class="text-xl sm:text-2xl font-cyber font-black neon-cyan">
+              140 <span class="text-xs text-cyan-300 font-normal">KM/H</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Cash Earned -->
+        <div class="text-center">
+          <div class="text-[9px] text-emerald-400 font-cyber tracking-widest uppercase">ইনকাম / EARNINGS</div>
+          <div id="hudCashRun" class="text-xl sm:text-2xl font-cyber font-black neon-green">
+            ৳ 0
+            <span id="hudCombo" class="hidden ml-1 text-xs text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded font-cyber">1.0x</span>
+          </div>
+        </div>
+
+        <!-- In-Game Shop Button -->
+        <button onclick="openShop('upgrades')" class="pointer-auto hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 hover:border-emerald-400 text-emerald-300 transition-colors">
+          <span class="text-lg">🛍️</span>
+          <div class="text-left font-cyber text-xs">
+            <div class="text-[8px] text-emerald-400">টাইকুন শপ</div>
+            <div id="hudWalletTop" class="font-bold text-white">৳ 3,000</div>
+          </div>
+        </button>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-1.5 pointer-auto">
+          <button id="btnAudio" onclick="toggleAudio()" class="p-2 rounded-xl bg-slate-900/90 border border-cyan-500/30 text-cyan-400 hover:border-cyan-300 transition-colors">
+            🔊
+          </button>
+          <button onclick="togglePause()" class="p-2 rounded-xl bg-slate-900/90 border border-cyan-500/30 text-cyan-400 hover:border-cyan-300 transition-colors">
+            ⏸
+          </button>
+        </div>
+      </div>
+
+      <!-- Gauges: Nitro, Shields, Active Road -->
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+        <div class="panel rounded-xl px-3 py-1.5 flex flex-col justify-center">
+          <div class="flex justify-between text-[10px] font-cyber text-cyan-400 mb-1">
+            <span>🔥 নাইট্রো বুস্ট</span>
+            <span id="hudNitroText">100%</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+            <div id="hudNitroBar" class="h-full bg-gradient-to-r from-cyan-400 via-pink-500 to-purple-500 rounded-full w-full"></div>
+          </div>
+        </div>
+
+        <div class="panel rounded-xl px-3 py-1.5 flex flex-col justify-center">
+          <div class="flex justify-between text-[10px] font-cyber text-blue-400 mb-1">
+            <span>🛡️ আর্মার শিল্ড</span>
+            <span id="hudShieldText">1 / 1</span>
+          </div>
+          <div id="hudShieldPills" class="flex gap-1 h-1.5">
+            <div class="flex-1 h-full rounded-full bg-blue-400 shadow-[0_0_8px_#3b82f6]"></div>
+          </div>
+        </div>
+
+        <div class="col-span-2 md:col-span-1 panel rounded-xl px-3 py-1.5 flex items-center justify-between text-[11px] font-cyber text-amber-300">
+          <span id="hudRoadName">🛣️ নিয়ন সাইবার সিটি</span>
+          <span class="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">100% IN-GAME</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLOATING CASH TOAST -->
+    <div id="cashToast" class="hidden absolute top-32 left-1/2 -translate-x-1/2 px-5 py-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-300 text-white font-cyber font-bold text-sm shadow-[0_0_30px_#00e676] animate-bounce">
+      +৳ ৫০০ সংগৃহীত
+    </div>
+
+    <!-- ON-SCREEN MOBILE CONTROLS -->
+    <div id="mobileControls" class="hidden pointer-auto fixed bottom-5 inset-x-4 flex justify-between items-center z-20">
+      <div class="flex gap-3">
+        <button id="btnLeft" class="w-16 h-16 rounded-2xl bg-cyan-950/80 border-2 border-cyan-400 text-cyan-300 flex items-center justify-center font-bold text-2xl active:bg-cyan-700/80 shadow-[0_0_20px_rgba(0,234,255,0.4)]">
+          ◀
+        </button>
+        <button id="btnRight" class="w-16 h-16 rounded-2xl bg-cyan-950/80 border-2 border-cyan-400 text-cyan-300 flex items-center justify-center font-bold text-2xl active:bg-cyan-700/80 shadow-[0_0_20px_rgba(0,234,255,0.4)]">
+          ▶
+        </button>
+      </div>
+      <button id="btnNitro" class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-pink-600 to-cyan-500 border-2 border-white text-white flex flex-col items-center justify-center font-cyber font-black active:scale-95 shadow-[0_0_30px_rgba(255,0,128,0.7)]">
+        <span class="text-2xl">🔥</span>
+        <span class="text-[9px] tracking-wider">NITRO</span>
+      </button>
+    </div>
+
+    <!-- START / MAIN MENU -->
+    <div id="startScreen" class="pointer-auto absolute inset-0 flex items-center justify-center p-4 bg-black/60 backdrop-blur-[3px]">
+      <div class="panel max-w-md w-full rounded-3xl p-6 sm:p-7 text-center flex flex-col gap-3.5">
+        <div class="inline-flex self-center px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-400/40 text-[10px] font-cyber text-cyan-300 tracking-[2px] uppercase">
+          3D হাইওয়ে কার রেসার · টাইকুন শপ
+        </div>
+
+        <div>
+          <h1 class="text-4xl sm:text-5xl font-cyber font-black text-white drop-shadow-[0_0_20px_rgba(0,234,255,0.6)]">
+            SPEED <span class="text-emerald-400">TYCOON</span>
+          </h1>
+          <div class="text-[11px] font-cyber tracking-[3px] text-cyan-300 uppercase mt-0.5">
+            হাইওয়ে কার রেসার ও ইন-গেম শপ
+          </div>
+        </div>
+
+        <!-- Wallet Card -->
+        <div class="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-teal-950/80 border border-emerald-500/60 rounded-2xl p-3.5 flex items-center justify-between text-left">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-xl">
+              💰
+            </div>
+            <div>
+              <div class="text-[9px] font-cyber text-emerald-400 font-bold uppercase">ক্যাশ ওয়ালেট ব্যালেন্স</div>
+              <div id="menuWalletBalance" class="text-2xl font-cyber font-black text-emerald-300">
+                ৳ 3,000
+              </div>
+            </div>
+          </div>
+          <button onclick="openShop('cars')" class="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-cyber font-bold text-xs flex items-center gap-1 shadow-[0_0_15px_rgba(0,230,118,0.5)]">
+            🛍️ মেগা শপ
+          </button>
+        </div>
+
+        <!-- Quick Hub: Car & Road Selector -->
+        <div class="grid grid-cols-2 gap-2 text-left font-cyber text-xs">
+          <div onclick="openShop('cars')" class="p-3 rounded-2xl bg-black/50 border border-cyan-500/30 hover:border-cyan-400 cursor-pointer">
+            <div class="text-[9px] text-cyan-400">সুপারকার ❯</div>
+            <div id="menuCarName" class="font-bold text-white truncate mt-0.5">CYBER COUGAR GT</div>
+          </div>
+          <div onclick="openShop('roads')" class="p-3 rounded-2xl bg-black/50 border border-purple-500/30 hover:border-purple-400 cursor-pointer">
+            <div class="text-[9px] text-purple-400">রাস্তা ও ট্র্যাক ❯</div>
+            <div id="menuRoadName" class="font-bold text-white truncate mt-0.5">নিয়ন সাইবার সিটি</div>
+          </div>
+        </div>
+
+        <!-- Lucky Spin Banner -->
+        <button onclick="openLuckySpin()" class="py-2.5 px-4 rounded-2xl bg-amber-500/20 border border-amber-400/50 text-amber-300 font-cyber font-bold text-xs flex items-center justify-between">
+          <span>🎰 ভাগ্য চাকা (Lucky Spin)</span>
+          <span class="px-2 py-0.5 rounded-full bg-amber-400 text-black text-[10px]">স্পিন করুন!</span>
+        </button>
+
+        <div class="flex justify-between items-center text-xs font-cyber text-slate-400 px-1 pt-1 border-t border-slate-800">
+          <span>🏆 হাই-স্কোর</span>
+          <span id="menuBestScore" class="font-bold text-white">0 PTS</span>
+        </div>
+
+        <button onclick="startGame()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-300 text-black font-cyber font-black text-lg tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_0_35px_rgba(0,234,255,0.7)] hover:brightness-110 active:scale-95 transition-all">
+          ▶ রেস শুরু করুন (START)
+        </button>
+      </div>
+    </div>
+
+    <!-- IN-GAME TYCOON SHOP MODAL -->
+    <div id="shopScreen" class="hidden pointer-auto fixed inset-0 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md z-30">
+      <div class="panel max-w-2xl w-full rounded-3xl p-5 flex flex-col gap-4 max-h-[92vh] overflow-hidden">
+        <div class="flex justify-between items-center border-b border-cyan-500/30 pb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">🛍️</span>
+            <div>
+              <h2 class="text-xl font-cyber font-black text-white">মেগা টাইকুন শপ</h2>
+              <p class="text-[10px] text-slate-400">রেসের টাকা দিয়ে সুপারকার, রাস্তা ও টিউনিং কিনুন</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="px-3 py-1 rounded-xl bg-emerald-950 border border-emerald-500/50 text-emerald-300 font-cyber font-bold text-sm">
+              ৳ <span id="shopBalance">3,000</span>
+            </div>
+            <button onclick="closeShop()" class="p-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-lg">✕</button>
+          </div>
+        </div>
+
+        <!-- Shop Tabs -->
+        <div class="flex gap-1.5 border-b border-slate-800 pb-2 font-cyber text-xs overflow-x-auto">
+          <button id="tabBtnCars" onclick="switchShopTab('cars')" class="py-2 px-3 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400 font-bold">🏎️ সুপারকার</button>
+          <button id="tabBtnRoads" onclick="switchShopTab('roads')" class="py-2 px-3 rounded-xl bg-slate-900 text-slate-400">🛣️ রাস্তা ও পরিবেশ</button>
+          <button id="tabBtnUpgrades" onclick="switchShopTab('upgrades')" class="py-2 px-3 rounded-xl bg-slate-900 text-slate-400">⚡ টিউনিং ও আপগ্রেড</button>
+        </div>
+
+        <!-- Shop Tab Body -->
+        <div id="shopTabContent" class="overflow-y-auto flex-1 pr-1 flex flex-col gap-3 font-cyber text-xs">
+          <!-- Dynamically populated via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- LUCKY SPIN MODAL -->
+    <div id="spinScreen" class="hidden pointer-auto fixed inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md z-30">
+      <div class="panel max-w-sm w-full rounded-3xl p-6 text-center flex flex-col items-center gap-4">
+        <button onclick="closeLuckySpin()" class="self-end text-slate-400 hover:text-white">✕</button>
+        <h3 class="text-2xl font-cyber font-black text-white">ভাগ্য চাকা <span class="text-amber-400">স্পিন</span></h3>
+        <p class="text-xs text-slate-400">চাকা ঘুরিয়ে জিতে নিন ক্যাশ জ্যাকপট ও শিল্ড!</p>
+
+        <div id="wheelGraphic" class="w-48 h-48 rounded-full border-4 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.5)] flex items-center justify-center text-4xl transition-transform duration-[3800ms] ease-out">
+          🎰
+        </div>
+
+        <div id="spinResult" class="hidden px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-400 text-amber-300 font-bold text-sm"></div>
+
+        <button id="btnDoSpin" onclick="spinWheel()" class="w-full py-3.5 rounded-2xl bg-amber-400 text-black font-cyber font-black text-sm shadow-[0_0_20px_rgba(245,158,11,0.5)]">
+          🎁 ফ্রি স্পিন করুন!
+        </button>
+      </div>
+    </div>
+
+    <!-- PAUSE SCREEN -->
+    <div id="pauseScreen" class="hidden pointer-auto absolute inset-0 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+      <div class="panel max-w-xs w-full rounded-3xl p-6 text-center flex flex-col gap-3">
+        <h2 class="text-2xl font-cyber font-black text-white">PAUSED</h2>
+        <button onclick="togglePause()" class="w-full py-3 rounded-xl bg-cyan-400 text-black font-cyber font-bold">▶ খেলা চালিয়ে যান</button>
+        <button onclick="goHome()" class="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 font-cyber text-xs">🏠 মেইন মেনু</button>
+      </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="gameOverScreen" class="hidden pointer-auto absolute inset-0 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+      <div class="panel max-w-md w-full rounded-3xl p-6 sm:p-7 text-center flex flex-col gap-3.5 border-red-500/50">
+        <div class="text-4xl">💥</div>
+        <h2 class="text-2xl font-cyber font-black text-red-400">গাড়ি অ্যাক্সিডেন্ট হয়েছে!</h2>
+
+        <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 border border-emerald-500/50 rounded-2xl p-3 flex justify-between items-center text-left font-cyber">
+          <div>
+            <div class="text-[9px] text-emerald-400 font-bold uppercase">এই রেসে মোট ইনকাম:</div>
+            <div id="overCashEarned" class="text-2xl font-black text-emerald-300">+ ৳ 0</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[9px] text-slate-400">মোট ওয়ালেট:</div>
+            <div id="overWalletTotal" class="text-sm font-bold text-white">৳ 3,000</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 font-cyber text-xs">
+          <div class="p-2 rounded-xl bg-black/50 border border-slate-800">
+            <div class="text-[8px] text-slate-400">স্কোর</div>
+            <div id="overScore" class="font-bold text-white">0</div>
+          </div>
+          <div class="p-2 rounded-xl bg-black/50 border border-slate-800">
+            <div class="text-[8px] text-slate-400">দূরত্ব</div>
+            <div id="overDistance" class="font-bold text-white">0 M</div>
+          </div>
+          <div class="p-2 rounded-xl bg-black/50 border border-slate-800">
+            <div class="text-[8px] text-slate-400">টপ স্পিড</div>
+            <div id="overSpeed" class="font-bold text-white">140 KM/H</div>
+          </div>
+        </div>
+
+        <button onclick="startGame()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-black font-cyber font-black text-sm shadow-[0_0_25px_rgba(0,234,255,0.5)]">
+          🔄 আবার খেলুন ও ইনকাম করুন
+        </button>
+
+        <div class="grid grid-cols-2 gap-2 font-cyber text-xs">
+          <button onclick="openShop('cars')" class="py-2.5 rounded-xl bg-emerald-950 border border-emerald-500/50 text-emerald-300 font-bold">
+            🛍️ মেগা শপ (কিনুন)
+          </button>
+          <button onclick="goHome()" class="py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300">
+            🏠 মেইন মেনু
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* CARS & ROADS DATA */
+    const CARS = [
+      { id: 'cougar', name: 'CYBER COUGAR GT', brand: 'NEXUS', speed: 230, nitro: 75, shields: 1, color: 0x00eaff, underglow: '#00eaff', price: 0, unlocked: true },
+      { id: 'phantom', name: 'PHANTOM VENOM RS', brand: 'APEX', speed: 275, nitro: 95, shields: 2, color: 0xff0077, underglow: '#ff0077', price: 8500, unlocked: false },
+      { id: 'lambo', name: 'NEON LAMBO APEX', brand: 'BULLET', speed: 315, nitro: 115, shields: 2, color: 0xffaa00, underglow: '#ffaa00', price: 25000, unlocked: false },
+      { id: 'chrono', name: 'BUGATTI CHRONO X', brand: 'LUXURY', speed: 360, nitro: 135, shields: 3, color: 0x9d4edd, underglow: '#00ffcc', price: 60000, unlocked: false },
+      { id: 'titan', name: 'CYBER TITAN 6X6', brand: 'ARMORED', speed: 290, nitro: 110, shields: 4, color: 0x10b981, underglow: '#10b981', price: 95000, unlocked: false },
+    ];
+
+    const ROADS = [
+      { id: 'r1', name: 'রৌদ্রোজ্জ্বল সান সিটি হাইওয়ে (দিনের বেলা)', price: 0, unlocked: true, roadColor: 0x22262d, lineA: 0xffffff, lineB: 0xffcc00, fog: 0x87ceeb, isDay: true },
+      { id: 'r2', name: 'নিয়ন সাইবার সিটি (নাইট)', price: 8000, unlocked: false, roadColor: 0x04060e, lineA: 0x00eaff, lineB: 0xff0077, fog: 0x04081c, isDay: false },
+      { id: 'r3', name: 'টোকিও রেইন ড্রাইভ', price: 15000, unlocked: false, roadColor: 0x020a16, lineA: 0x38bdf8, lineB: 0x818cf8, fog: 0x041324, isDay: false },
+      { id: 'r4', name: 'মরুভূমি গোল্ডেন সানসেট', price: 30000, unlocked: false, roadColor: 0x1f1608, lineA: 0xf59e0b, lineB: 0xd97706, fog: 0x1c1003, isDay: true },
+    ];
+
+    let upgrades = {
+      engineLevel: 1,
+      nitroLevel: 1,
+      shieldLevel: 1,
+      magnetLevel: 1,
+      multiplierLevel: 1,
+    };
+
+    /* ANTI-CHEAT & ENCRYPTED STORAGE */
+    const _SALT = 'ST3D_STANDALONE_SECURE_';
+    function _hash(s) {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
+      return (h >>> 0).toString(36);
+    }
+    function _saveSec(key, val) {
+      try {
+        const raw = JSON.stringify(val);
+        const encoded = btoa(encodeURIComponent(raw)).split('').reverse().join('');
+        localStorage.setItem(key, JSON.stringify({ d: encoded, c: _hash(_SALT + key + raw) }));
+      } catch { localStorage.setItem(key, JSON.stringify(val)); }
+    }
+    function _loadSec(key, fallback) {
+      try {
+        const item = localStorage.getItem(key);
+        if (!item) return fallback;
+        if (item.startsWith('{"d":')) {
+          const parsed = JSON.parse(item);
+          const decoded = decodeURIComponent(atob(parsed.d.split('').reverse().join('')));
+          if (parsed.c === _hash(_SALT + key + decoded)) return JSON.parse(decoded);
+          return fallback;
+        }
+        return JSON.parse(item);
+      } catch { return fallback; }
+    }
+
+    /* STATE & PERSISTENCE */
+    let walletBalance = _loadSec('st_wallet_v5', 3000);
+    let bestScore = _loadSec('st_best_v5', 0);
+    let carIdx = 0;
+    let roadIdx = 0;
+    let freeSpinReady = true;
+
+    // Load unlocks
+    try {
+      const uCars = _loadSec('st_cars_v5', []);
+      uCars.forEach((u, i) => { if (CARS[i]) CARS[i].unlocked = u; });
+      const uRoads = _loadSec('st_roads_v5', []);
+      uRoads.forEach((u, i) => { if (ROADS[i]) ROADS[i].unlocked = u; });
+      const uUp = _loadSec('st_upgrades_v5', {});
+      if (uUp.engineLevel) upgrades = uUp;
+    } catch {}
+
+    /* GAME RUNTIME VARIABLES */
+    let scene, camera, renderer, clock;
+    let playerGroup, shieldMesh, underglowLight;
+    let roadLines = [], buildings = [], roadMesh;
+    let traffic = [], pickups = [];
+    let running = false, paused = false, isBoosting = false;
+    let lane = 0, targetX = 0;
+    const laneWidth = 3.2;
+
+    let score = 0, distance = 0, speed = 140, nitro = 100, shields = 1, maxShields = 1;
+    let cashRun = 0, nearMisses = 0, combo = 1;
+    let spawnTimer = 0, pickupTimer = 0;
+
+    /* AUDIO SYSTEM */
+    let audioCtx = null;
+    let muted = false;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) audioCtx = new AC();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function toggleAudio() {
+      muted = !muted;
+      document.getElementById('btnAudio').textContent = muted ? '🔇' : '🔊';
+    }
+
+    function playTone(freq, dur = 0.1, type = 'sine', vol = 0.15) {
+      if (muted || !audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+      } catch {}
+    }
+
+    function playCashSound() {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+        setTimeout(() => playTone(f, 0.12, 'triangle', 0.2), i * 50);
+      });
+    }
+
+    /* THREE.JS SETUP */
+    function init() {
+      const canvas = document.getElementById('game');
+      clock = new THREE.Clock();
+      scene = new THREE.Scene();
+      applyRoadTheme();
+
+      camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1500);
+      camera.position.set(0, 4.8, 9.8);
+      camera.rotation.x = -0.22;
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+      setupLighting();
+      buildSky();
+      buildRoad();
+      buildCity();
+      buildPlayerCar();
+      setupControls();
+      updateUIBalances();
+
+      animate();
+    }
+
+    function setupLighting() {
+      scene.add(new THREE.AmbientLight(0x28184c, 1.2));
+      const d1 = new THREE.DirectionalLight(0x00eaff, 1.4);
+      d1.position.set(60, 90, -80);
+      scene.add(d1);
+      const d2 = new THREE.DirectionalLight(0xff0066, 1.2);
+      d2.position.set(-60, 70, -60);
+      scene.add(d2);
+    }
+
+    let sunMesh, skyDome;
+
+    function applyRoadTheme() {
+      const r = ROADS[roadIdx];
+      scene.background = new THREE.Color(r.fog);
+      scene.fog = new THREE.FogExp2(r.fog, r.isDay ? 0.0028 : 0.007);
+      if (roadMesh) roadMesh.material.color.setHex(r.roadColor);
+      roadLines.forEach((l, i) => l.material.color.setHex(i % 2 === 0 ? r.lineA : r.lineB));
+      document.getElementById('hudRoadName').textContent = '🛣️ ' + r.name;
+      document.getElementById('menuRoadName').textContent = r.name;
+      buildSky();
+    }
+
+    function buildSky() {
+      if (skyDome) scene.remove(skyDome);
+      if (sunMesh) scene.remove(sunMesh);
+
+      const r = ROADS[roadIdx];
+      if (r.isDay) {
+        // Daytime Sky Dome
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 0, 512);
+        grad.addColorStop(0, '#1a73e8');
+        grad.addColorStop(0.5, '#60a5fa');
+        grad.addColorStop(1, '#e0f2fe');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 512);
+
+        const skyTex = new THREE.CanvasTexture(canvas);
+        skyDome = new THREE.Mesh(new THREE.SphereGeometry(750, 32, 16), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide }));
+        scene.add(skyDome);
+
+        // Radiant Sun
+        sunMesh = new THREE.Mesh(new THREE.CircleGeometry(42, 32), new THREE.MeshBasicMaterial({ color: 0xfffbe6 }));
+        sunMesh.position.set(110, 160, -560);
+        scene.add(sunMesh);
+      } else {
+        // Night Starfield
+        const count = 1000;
+        const geom = new THREE.BufferGeometry();
+        const pos = new Float32Array(count * 3);
+        for (let i = 0; i < count * 3; i += 3) {
+          pos[i] = (Math.random() - 0.5) * 900;
+          pos[i + 1] = 20 + Math.random() * 250;
+          pos[i + 2] = -100 - Math.random() * 900;
+        }
+        geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        skyDome = new THREE.Points(geom, new THREE.PointsMaterial({ color: 0x8ceeff, size: 0.75 }));
+        scene.add(skyDome);
+      }
+    }
+
+    /* DYNAMIC WEATHER SYSTEM */
+    let currentWeather = 'clear';
+    let weatherTimer = 0;
+    let weatherDuration = 0;
+    let nextWeatherInterval = 20;
+    let weatherParticles = null;
+    let weatherPositions = null;
+    let targetFogDensity = 0.0028;
+    let targetFogColor = new THREE.Color(0x87ceeb);
+
+    function buildWeatherParticles() {
+      if (weatherParticles) {
+        scene.remove(weatherParticles);
+        weatherParticles.geometry.dispose();
+        weatherParticles = null;
+        weatherPositions = null;
+      }
+      if (currentWeather === 'rain') {
+        const count = 1100;
+        const geom = new THREE.BufferGeometry();
+        const pos = new Float32Array(count * 3);
+        for (let i = 0; i < count * 3; i += 3) {
+          pos[i] = (Math.random() - 0.5) * 50;
+          pos[i + 1] = Math.random() * 26;
+          pos[i + 2] = -Math.random() * 220;
+        }
+        geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        weatherPositions = pos;
+        weatherParticles = new THREE.Points(geom, new THREE.PointsMaterial({ color: 0x7dd3fc, size: 0.38, transparent: true, opacity: 0.85 }));
+        scene.add(weatherParticles);
+      } else if (currentWeather === 'fog') {
+        const count = 320;
+        const geom = new THREE.BufferGeometry();
+        const pos = new Float32Array(count * 3);
+        for (let i = 0; i < count * 3; i += 3) {
+          pos[i] = (Math.random() - 0.5) * 55;
+          pos[i + 1] = 0.8 + Math.random() * 9;
+          pos[i + 2] = 10 - Math.random() * 210;
+        }
+        geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        weatherPositions = pos;
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        g.addColorStop(0, 'rgba(255,255,255,0.4)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, 32, 32);
+        weatherParticles = new THREE.Points(geom, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(canvas), color: 0xdbeafe, size: 15.0, transparent: true, opacity: 0.35, depthWrite: false }));
+        scene.add(weatherParticles);
+      } else if (currentWeather === 'neon_snow') {
+        const count = 850;
+        const geom = new THREE.BufferGeometry();
+        const pos = new Float32Array(count * 3);
+        const col = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+          const idx = i * 3;
+          pos[idx] = (Math.random() - 0.5) * 50;
+          pos[idx + 1] = Math.random() * 25;
+          pos[idx + 2] = -Math.random() * 220;
+          const r = Math.random();
+          if (r < 0.45) { col[idx] = 0.15; col[idx+1] = 0.85; col[idx+2] = 1.0; }
+          else if (r < 0.85) { col[idx] = 0.98; col[idx+1] = 0.25; col[idx+2] = 0.75; }
+          else { col[idx] = 0.95; col[idx+1] = 0.98; col[idx+2] = 1.0; }
+        }
+        geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geom.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        weatherPositions = pos;
+        weatherParticles = new THREE.Points(geom, new THREE.PointsMaterial({ vertexColors: true, size: 0.7, transparent: true, opacity: 0.9 }));
+        scene.add(weatherParticles);
+      }
+    }
+
+    function setWeather(type) {
+      currentWeather = type;
+      buildWeatherParticles();
+      const r = ROADS[roadIdx];
+      if (type === 'rain') {
+        targetFogDensity = 0.0088;
+        targetFogColor = new THREE.Color(0x334155);
+        if (roadMesh) roadMesh.material.roughness = 0.10;
+        showCashToast('🌧️ প্রবল বৃষ্টি! রাস্তা পিচ্ছিল (-22% গ্রিপ) | +25% বোনাস');
+        playTone(130, 0.3, 'sawtooth', 0.15);
+      } else if (type === 'fog') {
+        targetFogDensity = 0.0175;
+        targetFogColor = new THREE.Color(0xcfd8dc);
+        if (roadMesh) roadMesh.material.roughness = 0.35;
+        showCashToast('🌫️ ঘন কুয়াশা! দৃষ্টিসীমা সংকুচিত | +40% বোনাস');
+        playTone(110, 0.4, 'sine', 0.18);
+      } else if (type === 'neon_snow') {
+        targetFogDensity = 0.0092;
+        targetFogColor = new THREE.Color(0x180b2b);
+        if (roadMesh) roadMesh.material.roughness = 0.20;
+        showCashToast('❄️ নিয়ন তুষারপাত! আইসি ড্রাফট (-38% গ্রিপ) | +50% বোনাস');
+        playTone(880, 0.2, 'sine', 0.15);
+      } else {
+        targetFogDensity = r.isDay ? 0.0028 : 0.007;
+        targetFogColor = new THREE.Color(r.fog);
+        if (roadMesh) roadMesh.material.roughness = 0.35;
+        showCashToast('☀️ আকাশ পরিষ্কার হয়েছে! স্বাভাবিক গ্রিপ');
+        playTone(580, 0.15, 'triangle', 0.15);
+      }
+    }
+
+    function buildRoad() {
+      const length = 1500;
+      const r = ROADS[roadIdx];
+      roadMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(30, length),
+        new THREE.MeshStandardMaterial({ color: r.roadColor, roughness: 0.35, metalness: 0.8 })
+      );
+      roadMesh.rotation.x = -Math.PI / 2;
+      roadMesh.position.set(0, 0, -length / 2 + 100);
+      scene.add(roadMesh);
+
+      // Lane dividers
+      const dividers = [-6.4, -3.2, 0, 3.2, 6.4];
+      for (let z = -length + 100; z < 100; z += 12) {
+        dividers.slice(0, 4).forEach((x, i) => {
+          const line = new THREE.Mesh(
+            new THREE.BoxGeometry(0.16, 0.04, 5.2),
+            new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? r.lineA : r.lineB })
+          );
+          line.position.set(x + 1.6, 0.04, z);
+          scene.add(line);
+          roadLines.push(line);
+        });
+      }
+    }
+
+    let trees = [];
+    function buildCity() {
+      buildings.forEach(b => scene.remove(b));
+      buildings = [];
+      trees.forEach(t => scene.remove(t));
+      trees = [];
+
+      const r = ROADS[roadIdx];
+      for (let z = -1200; z < 100; z += 30) {
+        [-1, 1].forEach(side => {
+          if (r.isDay) {
+            // Roadside Trees
+            const tg = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 3.2, 8), new THREE.MeshStandardMaterial({ color: 0x5c4033 }));
+            trunk.position.y = 1.6;
+            tg.add(trunk);
+            const foliage = new THREE.Mesh(new THREE.ConeGeometry(2.5, 4.5, 8), new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.6 }));
+            foliage.position.y = 4.2;
+            tg.add(foliage);
+            tg.position.set(side * (17 + Math.random() * 3), 0, z);
+            scene.add(tg);
+            trees.push(tg);
+          }
+
+          const h = 30 + Math.random() * 110;
+          const w = 12 + Math.random() * 16;
+          const b = new THREE.Mesh(
+            new THREE.BoxGeometry(w, h, 14),
+            new THREE.MeshStandardMaterial({ color: r.isDay ? 0xdbeafe : 0x040816, roughness: 0.3, metalness: 0.5 })
+          );
+          b.position.set(side * (27 + Math.random() * 25), h / 2, z);
+          scene.add(b);
+          buildings.push(b);
+        });
+      }
+    }
+
+    function buildPlayerCar() {
+      if (playerGroup) scene.remove(playerGroup);
+      const c = CARS[carIdx];
+      playerGroup = new THREE.Group();
+
+      // 1. Sleek Chassis
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.22, 4.3), new THREE.MeshStandardMaterial({ color: 0x111625, metalness: 0.8 }));
+      chassis.position.y = 0.22;
+      playerGroup.add(chassis);
+
+      // 2. Sculpted Body
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(1.78, 0.52, 3.9),
+        new THREE.MeshStandardMaterial({ color: c.color, metalness: 0.9, roughness: 0.15 })
+      );
+      body.position.y = 0.52;
+      playerGroup.add(body);
+
+      // 3. Front Windshield & Cabin
+      const cab = new THREE.Mesh(
+        new THREE.BoxGeometry(1.36, 0.45, 1.95),
+        new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.05, metalness: 0.95 })
+      );
+      cab.position.set(0, 0.96, -0.05);
+      playerGroup.add(cab);
+
+      // Roof
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.06, 1.35), new THREE.MeshStandardMaterial({ color: c.color }));
+      roof.position.set(0, 1.20, -0.05);
+      playerGroup.add(roof);
+
+      // 4. Spoiler
+      const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.08, 0.35), new THREE.MeshStandardMaterial({ color: 0x050814 }));
+      spoiler.position.set(0, 1.15, 1.85);
+      playerGroup.add(spoiler);
+
+      // 5. LED Headlights & Taillights
+      [-0.65, 0.65].forEach(hx => {
+        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.1), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        hl.position.set(hx, 0.58, -1.98);
+        playerGroup.add(hl);
+      });
+      const tl = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.12, 0.08), new THREE.MeshBasicMaterial({ color: 0xff002b }));
+      tl.position.set(0, 0.65, 1.98);
+      playerGroup.add(tl);
+
+      // 6. Alloy Wheels
+      const whGeom = new THREE.CylinderGeometry(0.38, 0.38, 0.28, 16);
+      const whMat = new THREE.MeshStandardMaterial({ color: 0x18181c, roughness: 0.7 });
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0xd9e2ec, metalness: 0.95 });
+
+      [[-0.94, -1.25], [0.94, -1.25], [-0.94, 1.25], [0.94, 1.25]].forEach(([x, z]) => {
+        const wg = new THREE.Group();
+        const tire = new THREE.Mesh(whGeom, whMat);
+        tire.rotation.z = Math.PI / 2;
+        wg.add(tire);
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.30, 14), rimMat);
+        rim.rotation.z = Math.PI / 2;
+        wg.add(rim);
+        wg.position.set(x, 0.38, z);
+        playerGroup.add(wg);
+      });
+
+      underglowLight = new THREE.PointLight(c.underglow, 2.5, 6);
+      underglowLight.position.set(0, 0.15, 0);
+      playerGroup.add(underglowLight);
+
+      shieldMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(2.3, 20, 20),
+        new THREE.MeshBasicMaterial({ color: 0x00eaff, wireframe: true, transparent: true, opacity: 0.3 })
+      );
+      shieldMesh.position.y = 0.6;
+      shieldMesh.visible = true;
+      playerGroup.add(shieldMesh);
+
+      playerGroup.position.set(0, 0, 3);
+      scene.add(playerGroup);
+
+      document.getElementById('menuCarName').textContent = c.name;
+    }
+
+    function spawnTraffic() {
+      const l = Math.floor(Math.random() * 5) - 2;
+      const g = new THREE.Group();
+      const carPaints = [0xd32f2f, 0x1976d2, 0x2e7d32, 0xf57c00, 0xffffff, 0x212121];
+      const color = carPaints[Math.floor(Math.random() * carPaints.length)];
+
+      const b = new THREE.Mesh(
+        new THREE.BoxGeometry(1.75, 0.60, 3.8),
+        new THREE.MeshStandardMaterial({ color, metalness: 0.85, roughness: 0.2 })
+      );
+      b.position.y = 0.52;
+      g.add(b);
+
+      const cab = new THREE.Mesh(
+        new THREE.BoxGeometry(1.35, 0.44, 2.0),
+        new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.1, metalness: 0.9 })
+      );
+      cab.position.set(0, 0.95, 0.1);
+      g.add(cab);
+
+      // Wheels
+      const whGeom = new THREE.CylinderGeometry(0.36, 0.36, 0.24, 12);
+      const whMat = new THREE.MeshStandardMaterial({ color: 0x18181c });
+      [[-0.92, -1.2], [0.92, -1.2], [-0.92, 1.2], [0.92, 1.2]].forEach(([x, z]) => {
+        const w = new THREE.Mesh(whGeom, whMat);
+        w.rotation.z = Math.PI / 2;
+        w.position.set(x, 0.36, z);
+        g.add(w);
+      });
+
+      g.position.set(l * laneWidth, 0, -250);
+      scene.add(g);
+      traffic.push({ group: g, speed: 75 + Math.random() * 40, passed: false });
+    }
+
+    function spawnCashPickup() {
+      const l = Math.floor(Math.random() * 5) - 2;
+      const group = new THREE.Group();
+      const isBundle = Math.random() < 0.6;
+      const value = isBundle ? 500 : 200;
+
+      const mesh = new THREE.Mesh(
+        isBundle ? new THREE.BoxGeometry(0.85, 0.28, 1.3) : new THREE.CylinderGeometry(0.48, 0.48, 0.16, 16),
+        new THREE.MeshStandardMaterial({ color: isBundle ? 0x00e676 : 0xffd700, metalness: isBundle ? 0.3 : 0.9 })
+      );
+      if (!isBundle) mesh.rotation.x = Math.PI / 2;
+      group.add(mesh);
+      group.position.set(l * laneWidth, 1.0, -230);
+      scene.add(group);
+      pickups.push({ group, value, active: true });
+    }
+
+    function setupControls() {
+      window.addEventListener('keydown', e => {
+        if (!e || typeof e.key !== 'string') return;
+        const k = e.key.toLowerCase();
+        if (e.key === 'ArrowLeft' || k === 'a') moveLeft();
+        if (e.key === 'ArrowRight' || k === 'd') moveRight();
+        if (e.key === 'ArrowUp' || k === 'w' || e.key === 'Shift') isBoosting = true;
+        if (e.key === 'Escape' || e.key === ' ') togglePause();
+      });
+      window.addEventListener('keyup', e => {
+        if (!e || typeof e.key !== 'string') return;
+        const k = e.key.toLowerCase();
+        if (e.key === 'ArrowUp' || k === 'w' || e.key === 'Shift') isBoosting = false;
+      });
+
+      document.getElementById('btnLeft').addEventListener('pointerdown', moveLeft);
+      document.getElementById('btnRight').addEventListener('pointerdown', moveRight);
+      const nb = document.getElementById('btnNitro');
+      nb.addEventListener('pointerdown', () => isBoosting = true);
+      nb.addEventListener('pointerup', () => isBoosting = false);
+      nb.addEventListener('pointerleave', () => isBoosting = false);
+
+      window.addEventListener('resize', () => {
+        if (!camera || !renderer) return;
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+    }
+
+    function moveLeft() {
+      if (!running || paused) return;
+      if (lane > -2) { lane--; targetX = lane * laneWidth; playTone(280, 0.04); }
+    }
+
+    function moveRight() {
+      if (!running || paused) return;
+      if (lane < 2) { lane++; targetX = lane * laneWidth; playTone(340, 0.04); }
+    }
+
+    function startGame() {
+      initAudio();
+      ['startScreen', 'shopScreen', 'spinScreen', 'pauseScreen', 'gameOverScreen'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      document.getElementById('hud').classList.remove('hidden');
+      document.getElementById('mobileControls').classList.remove('hidden');
+
+      score = 0; distance = 0; speed = 140; cashRun = 0; nearMisses = 0; combo = 1;
+      nitro = 100; shields = CARS[carIdx].shields + (upgrades.shieldLevel - 1); maxShields = shields;
+      lane = 0; targetX = 0;
+
+      traffic.forEach(t => scene.remove(t.group)); traffic = [];
+      pickups.forEach(p => scene.remove(p.group)); pickups = [];
+
+      playerGroup.position.set(0, 0, 3);
+      shieldMesh.visible = true;
+
+      currentWeather = 'clear';
+      weatherTimer = 0;
+      weatherDuration = 0;
+      nextWeatherInterval = 18 + Math.random() * 12;
+      setWeather('clear');
+
+      running = true; paused = false;
+    }
+
+    function togglePause() {
+      if (!running) return;
+      paused = !paused;
+      document.getElementById('pauseScreen').classList.toggle('hidden', !paused);
+    }
+
+    function goHome() {
+      running = false; paused = false;
+      ['hud', 'mobileControls', 'pauseScreen', 'gameOverScreen', 'shopScreen', 'spinScreen'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      document.getElementById('startScreen').classList.remove('hidden');
+      updateUIBalances();
+    }
+
+    function crash() {
+      if (!running) return;
+      if (shields > 1) {
+        shields--;
+        playTone(150, 0.2, 'sawtooth');
+        return;
+      }
+
+      running = false;
+      playTone(85, 0.6, 'triangle', 0.4);
+
+      walletBalance += cashRun;
+      _saveSec('st_wallet_v5', walletBalance);
+      if (score > bestScore) {
+        bestScore = Math.floor(score);
+        _saveSec('st_best_v5', bestScore);
+      }
+
+      document.getElementById('hud').classList.add('hidden');
+      document.getElementById('mobileControls').classList.add('hidden');
+      document.getElementById('overCashEarned').textContent = '+ ৳ ' + cashRun.toLocaleString();
+      document.getElementById('overWalletTotal').textContent = '৳ ' + walletBalance.toLocaleString();
+      document.getElementById('overScore').textContent = Math.floor(score).toLocaleString();
+      document.getElementById('overDistance').textContent = Math.floor(distance).toLocaleString() + ' M';
+      document.getElementById('overSpeed').textContent = Math.floor(speed) + ' KM/H';
+      document.getElementById('gameOverScreen').classList.remove('hidden');
+
+      if (window.confetti && cashRun >= 1500) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      }
+    }
+
+    function showCashToast(text) {
+      const t = document.getElementById('cashToast');
+      t.textContent = text;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 1100);
+    }
+
+    function update(dt) {
+      // Dynamic weather triggers
+      weatherTimer += dt;
+      if (currentWeather !== 'clear') {
+        weatherDuration -= dt;
+        if (weatherDuration <= 0) {
+          setWeather('clear');
+          weatherTimer = 0;
+          nextWeatherInterval = 22 + Math.random() * 20;
+        }
+      } else if (weatherTimer >= nextWeatherInterval) {
+        const list = ['rain', 'fog', 'neon_snow'];
+        setWeather(list[Math.floor(Math.random() * list.length)]);
+        weatherDuration = 18 + Math.random() * 15;
+        weatherTimer = 0;
+      }
+
+      // Fog interpolation
+      if (scene.fog) {
+        scene.fog.density += (targetFogDensity - scene.fog.density) * Math.min(1, dt * 1.5);
+        scene.fog.color.lerp(targetFogColor, Math.min(1, dt * 1.5));
+        scene.background = scene.fog.color;
+      }
+
+      const weatherBonus = currentWeather === 'rain' ? 1.25 : currentWeather === 'fog' ? 1.4 : currentWeather === 'neon_snow' ? 1.5 : 1.0;
+      const gripFactor = currentWeather === 'rain' ? 0.78 : currentWeather === 'neon_snow' ? 0.62 : 1.0;
+
+      const c = CARS[carIdx];
+      const engineBonus = (upgrades.engineLevel - 1) * 16;
+      let targetSpeed = (c.speed + engineBonus) * (0.90 + 0.10 * gripFactor);
+
+      if (isBoosting && nitro > 0) {
+        targetSpeed += c.nitro + (upgrades.nitroLevel - 1) * 18;
+        nitro = Math.max(0, nitro - dt * 32);
+        if (nitro <= 0) isBoosting = false;
+      } else {
+        nitro = Math.min(100, nitro + dt * 3.5);
+      }
+
+      speed += (targetSpeed - speed) * Math.min(1, dt * 2.5);
+      const forward = speed * 0.26 * dt;
+      distance += forward;
+      score += speed * 0.18 * dt * combo * weatherBonus;
+
+      const handleRate = currentWeather === 'rain' ? 10.0 : currentWeather === 'neon_snow' ? 7.2 : 14.0;
+      playerGroup.position.x += (targetX - playerGroup.position.x) * Math.min(1, dt * handleRate);
+      playerGroup.rotation.z = -(targetX - playerGroup.position.x) * (currentWeather === 'neon_snow' ? 0.12 : 0.06);
+
+      const roadMove = (speed * 0.065 + 10) * dt;
+      roadLines.forEach(l => {
+        l.position.z += roadMove;
+        if (l.position.z > 25) l.position.z -= 1400;
+      });
+      buildings.forEach(b => {
+        b.position.z += roadMove * 0.85;
+        if (b.position.z > 60) b.position.z -= 1300;
+      });
+      trees.forEach(t => {
+        t.position.z += roadMove;
+        if (t.position.z > 40) t.position.z -= 1300;
+      });
+
+      // Weather Particles update
+      if (weatherParticles && weatherPositions) {
+        const count = weatherPositions.length / 3;
+        for (let i = 0; i < count; i++) {
+          const idx = i * 3;
+          if (currentWeather === 'rain') {
+            weatherPositions[idx + 1] -= dt * 190;
+            weatherPositions[idx + 2] += roadMove * 0.95;
+            if (weatherPositions[idx + 1] < 0) {
+              weatherPositions[idx + 1] = 23 + Math.random() * 3;
+              weatherPositions[idx + 2] = -Math.random() * 220;
+            }
+          } else if (currentWeather === 'fog') {
+            weatherPositions[idx] += Math.sin(performance.now() * 0.0012 + i) * dt * 2.8;
+            weatherPositions[idx + 2] += roadMove * 0.45;
+            if (weatherPositions[idx + 2] > 25) {
+              weatherPositions[idx + 2] = -210;
+              weatherPositions[idx] = (Math.random() - 0.5) * 55;
+            }
+          } else if (currentWeather === 'neon_snow') {
+            weatherPositions[idx + 1] -= dt * 14;
+            weatherPositions[idx] += Math.sin(performance.now() * 0.0025 + i) * dt * 5.5;
+            weatherPositions[idx + 2] += roadMove * 0.55;
+            if (weatherPositions[idx + 1] < 0) {
+              weatherPositions[idx + 1] = 24 + Math.random() * 3;
+              weatherPositions[idx + 2] = -Math.random() * 220;
+            }
+          }
+        }
+        weatherParticles.geometry.attributes.position.needsUpdate = true;
+      }
+
+      spawnTimer += dt;
+      if (spawnTimer > 0.9) { spawnTraffic(); spawnTimer = 0; }
+      pickupTimer += dt;
+      if (pickupTimer > 2.7) { spawnCashPickup(); pickupTimer = 0; }
+
+      // Traffic
+      for (let i = traffic.length - 1; i >= 0; i--) {
+        const t = traffic[i];
+        t.group.position.z += ((speed - t.speed) * 0.055 + 8) * dt;
+
+        const cx = Math.abs(playerGroup.position.x - t.group.position.x);
+        const cz = Math.abs(playerGroup.position.z - t.group.position.z);
+
+        // Near-Miss Bonus
+        if (!t.passed && t.group.position.z > playerGroup.position.z - 2.2) {
+          t.passed = true;
+          if (cx > 1.6 && cx < 3.0) {
+            nearMisses++;
+            combo = Math.min(8, combo + 1);
+            const mult = 1 + (upgrades.multiplierLevel - 1) * 0.25;
+            const bTaka = Math.floor(150 * combo * mult * weatherBonus);
+            cashRun += bTaka;
+            playTone(720, 0.1, 'sine', 0.2);
+            showCashToast('রিস্কি ওভারটেক: +৳ ' + bTaka);
+          }
+        }
+
+        if (cx < 1.95 && cz < 3.9) {
+          crash();
+          break;
+        }
+
+        if (t.group.position.z > 30) { scene.remove(t.group); traffic.splice(i, 1); }
+      }
+
+      // Cash Magnet suction
+      const magnetRadius = 3.5 + upgrades.magnetLevel * 3.5;
+
+      // Cash Pickups
+      for (let i = pickups.length - 1; i >= 0; i--) {
+        const p = pickups[i];
+        p.group.position.z += roadMove;
+        p.group.rotation.y += dt * 3.5;
+
+        // Magnet attraction
+        const dist = playerGroup.position.distanceTo(p.group.position);
+        if (p.active && dist < magnetRadius) {
+          const dir = new THREE.Vector3().subVectors(playerGroup.position, p.group.position).normalize();
+          p.group.position.addScaledVector(dir, 18 * dt);
+        }
+
+        if (p.active && dist < 2.5) {
+          p.active = false;
+          const mult = 1 + (upgrades.multiplierLevel - 1) * 0.25;
+          const finalVal = Math.floor(p.value * mult * weatherBonus);
+          cashRun += finalVal;
+          playCashSound();
+          showCashToast('+৳ ' + finalVal + ' সংগৃহীত');
+          scene.remove(p.group);
+          pickups.splice(i, 1);
+          continue;
+        }
+
+        if (p.group.position.z > 25) { scene.remove(p.group); pickups.splice(i, 1); }
+      }
+
+      // Update HUD
+      document.getElementById('hudSpeed').childNodes[0].nodeValue = Math.floor(speed) + ' ';
+      document.getElementById('hudCashRun').childNodes[0].nodeValue = '৳ ' + cashRun.toLocaleString() + ' ';
+      document.getElementById('hudWalletTop').textContent = '৳ ' + (walletBalance + cashRun).toLocaleString();
+      document.getElementById('hudNitroText').textContent = Math.floor(nitro) + '%';
+      document.getElementById('hudNitroBar').style.width = Math.floor(nitro) + '%';
+      document.getElementById('hudShieldText').textContent = shields + ' / ' + maxShields;
+    }
+
+    function updateUIBalances() {
+      document.getElementById('menuWalletBalance').textContent = '৳ ' + walletBalance.toLocaleString();
+      document.getElementById('menuBestScore').textContent = bestScore.toLocaleString() + ' PTS';
+      document.getElementById('shopBalance').textContent = walletBalance.toLocaleString();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      if (running && !paused) update(dt);
+      renderer.render(scene, camera);
+    }
+
+    /* IN-GAME MEGA SHOP */
+    let currentShopTab = 'cars';
+
+    function openShop(tab = 'cars') {
+      currentShopTab = tab;
+      document.getElementById('startScreen').classList.add('hidden');
+      document.getElementById('gameOverScreen').classList.add('hidden');
+      document.getElementById('shopScreen').classList.remove('hidden');
+      updateUIBalances();
+      renderShop();
+    }
+
+    function closeShop() {
+      document.getElementById('shopScreen').classList.add('hidden');
+      if (!running) document.getElementById('startScreen').classList.remove('hidden');
+    }
+
+    function switchShopTab(t) {
+      currentShopTab = t;
+      ['tabBtnCars', 'tabBtnRoads', 'tabBtnUpgrades'].forEach(id => {
+        document.getElementById(id).className = 'py-2 px-3 rounded-xl bg-slate-900 text-slate-400';
+      });
+      const activeBtn = t === 'cars' ? 'tabBtnCars' : t === 'roads' ? 'tabBtnRoads' : 'tabBtnUpgrades';
+      document.getElementById(activeBtn).className = 'py-2 px-3 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400 font-bold';
+      renderShop();
+    }
+
+    function renderShop() {
+      const container = document.getElementById('shopTabContent');
+      container.innerHTML = '';
+
+      if (currentShopTab === 'cars') {
+        CARS.forEach((car, i) => {
+          const div = document.createElement('div');
+          div.className = 'p-3.5 rounded-2xl bg-black/50 border ' + (carIdx === i ? 'border-cyan-400 bg-cyan-950/30' : 'border-slate-800') + ' flex justify-between items-center';
+          div.innerHTML = `
+            <div>
+              <div class="text-[9px] text-cyan-400 font-bold">${car.brand}</div>
+              <div class="text-sm font-bold text-white">${car.name}</div>
+              <div class="text-[10px] text-slate-400">টপ স্পিড: ${car.speed} KM/H · শিল্ড: ${car.shields}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-emerald-400 font-bold mb-1">${car.price === 0 ? 'ফ্রি' : '৳ ' + car.price.toLocaleString()}</div>
+              ${car.unlocked ? (
+                carIdx === i
+                  ? '<span class="px-3 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 font-bold text-[10px]">✓ ড্রাইভ করছেন</span>'
+                  : `<button onclick="selectCar(${i})" class="px-3 py-1 rounded-xl bg-cyan-500 text-black font-bold text-[10px]">সিলেক্ট করুন</button>`
+              ) : (
+                `<button onclick="buyCar(${i})" class="px-3 py-1 rounded-xl ${walletBalance >= car.price ? 'bg-emerald-500 text-black' : 'bg-slate-800 text-slate-500'} font-bold text-[10px]">কিনুন</button>`
+              )}
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      } else if (currentShopTab === 'roads') {
+        ROADS.forEach((road, i) => {
+          const div = document.createElement('div');
+          div.className = 'p-3.5 rounded-2xl bg-black/50 border ' + (roadIdx === i ? 'border-purple-400 bg-purple-950/30' : 'border-slate-800') + ' flex justify-between items-center';
+          div.innerHTML = `
+            <div>
+              <div class="text-[9px] text-purple-400 font-bold">হাইওয়ে #${i + 1}</div>
+              <div class="text-sm font-bold text-white">${road.name}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-emerald-400 font-bold mb-1">${road.price === 0 ? 'ফ্রি' : '৳ ' + road.price.toLocaleString()}</div>
+              ${road.unlocked ? (
+                roadIdx === i
+                  ? '<span class="px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 font-bold text-[10px]">✓ সক্রিয় রাস্তা</span>'
+                  : `<button onclick="selectRoad(${i})" class="px-3 py-1 rounded-xl bg-purple-600 text-white font-bold text-[10px]">সিলেক্ট করুন</button>`
+              ) : (
+                `<button onclick="buyRoad(${i})" class="px-3 py-1 rounded-xl ${walletBalance >= road.price ? 'bg-emerald-500 text-black' : 'bg-slate-800 text-slate-500'} font-bold text-[10px]">কিনুন</button>`
+              )}
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      } else if (currentShopTab === 'upgrades') {
+        const upgList = [
+          { key: 'engineLevel', name: 'টপ স্পিড ইঞ্জিন টিউনিং', cost: upgrades.engineLevel * 3500 },
+          { key: 'nitroLevel', name: 'টার্বো নাইট্রো বুস্টার', cost: upgrades.nitroLevel * 2800 },
+          { key: 'shieldLevel', name: 'আর্মার শিল্ড প্রটেকশন', cost: upgrades.shieldLevel * 4000 },
+          { key: 'magnetLevel', name: 'ক্যাশ ম্যাগনেট গ্যাজেট', cost: upgrades.magnetLevel * 3000 },
+          { key: 'multiplierLevel', name: 'ইনকাম মাল্টিপ্লায়ার (Tycoon)', cost: upgrades.multiplierLevel * 5000 },
+        ];
+
+        upgList.forEach(u => {
+          const lvl = upgrades[u.key];
+          const div = document.createElement('div');
+          div.className = 'p-3.5 rounded-2xl bg-black/50 border border-slate-800 flex justify-between items-center';
+          div.innerHTML = `
+            <div>
+              <div class="text-sm font-bold text-white">${u.name}</div>
+              <div class="text-[10px] text-cyan-400">বর্তমান লেভেল: ${lvl} / 5</div>
+            </div>
+            <div class="text-right">
+              ${lvl >= 5 ? '<span class="text-xs text-emerald-400 font-bold">ম্যাক্স লেভেল</span>' : `
+                <div class="text-xs text-emerald-400 font-bold mb-1">৳ ${u.cost.toLocaleString()}</div>
+                <button onclick="buyUpgrade('${u.key}', ${u.cost})" class="px-3 py-1 rounded-xl ${walletBalance >= u.cost ? 'bg-cyan-500 text-black' : 'bg-slate-800 text-slate-500'} font-bold text-[10px]">আপগ্রেড</button>
+              `}
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      }
+    }
+
+    function selectCar(i) {
+      carIdx = i;
+      buildPlayerCar();
+      renderShop();
+    }
+
+    function buyCar(i) {
+      const c = CARS[i];
+      if (walletBalance >= c.price) {
+        walletBalance -= c.price;
+        c.unlocked = true;
+        _saveSec('st_wallet_v5', walletBalance);
+        _saveSec('st_cars_v5', CARS.map(x => x.unlocked));
+        playCashSound();
+        selectCar(i);
+        updateUIBalances();
+        if (window.confetti) confetti({ particleCount: 70, spread: 60 });
+      }
+    }
+
+    function selectRoad(i) {
+      roadIdx = i;
+      applyRoadTheme();
+      renderShop();
+    }
+
+    function buyRoad(i) {
+      const r = ROADS[i];
+      if (walletBalance >= r.price) {
+        walletBalance -= r.price;
+        r.unlocked = true;
+        _saveSec('st_wallet_v5', walletBalance);
+        _saveSec('st_roads_v5', ROADS.map(x => x.unlocked));
+        playCashSound();
+        selectRoad(i);
+        updateUIBalances();
+        if (window.confetti) confetti({ particleCount: 70, spread: 60 });
+      }
+    }
+
+    function buyUpgrade(key, cost) {
+      if (walletBalance >= cost && upgrades[key] < 5) {
+        walletBalance -= cost;
+        upgrades[key]++;
+        _saveSec('st_wallet_v5', walletBalance);
+        _saveSec('st_upgrades_v5', upgrades);
+        playCashSound();
+        updateUIBalances();
+        renderShop();
+        if (window.confetti) confetti({ particleCount: 60, spread: 50 });
+      }
+    }
+
+    /* LUCKY WHEEL */
+    function openLuckySpin() {
+      document.getElementById('startScreen').classList.add('hidden');
+      document.getElementById('spinScreen').classList.remove('hidden');
+      document.getElementById('spinResult').classList.add('hidden');
+    }
+
+    function closeLuckySpin() {
+      document.getElementById('spinScreen').classList.add('hidden');
+      document.getElementById('startScreen').classList.remove('hidden');
+    }
+
+    let spinning = false;
+    function spinWheel() {
+      if (spinning) return;
+      initAudio();
+      spinning = true;
+      const prizes = [1000, 2500, 5000, 10000, 1500, 3000];
+      const win = prizes[Math.floor(Math.random() * prizes.length)];
+
+      const wheel = document.getElementById('wheelGraphic');
+      const rot = 1440 + Math.floor(Math.random() * 360);
+      wheel.style.transform = 'rotate(' + rot + 'deg)';
+
+      playTone(520, 0.05);
+
+      setTimeout(() => {
+        spinning = false;
+        walletBalance += win;
+        _saveSec('st_wallet_v5', walletBalance);
+        updateUIBalances();
+
+        playCashSound();
+        if (window.confetti) confetti({ particleCount: 120, spread: 80 });
+
+        const res = document.getElementById('spinResult');
+        res.textContent = '🎉 অভিনন্দন! আপনি জিতেছেন ৳ ' + win.toLocaleString() + '!';
+        res.classList.remove('hidden');
+      }, 3900);
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

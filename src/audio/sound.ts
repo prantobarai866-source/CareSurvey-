@@ -253,25 +253,187 @@ class TycoonAudioSystem {
     if (this.isMuted || !this.ctx) return;
     try {
       if (type === 'rain') {
-        // Quick rain/thunder swell
         this.tone(140, 0.4, 'sawtooth', 0.15);
         setTimeout(() => this.tone(90, 0.6, 'triangle', 0.2), 120);
       } else if (type === 'fog') {
-        // Low mystic warning drone
         this.tone(110, 0.8, 'sine', 0.18);
         setTimeout(() => this.tone(165, 0.6, 'triangle', 0.14), 180);
       } else if (type === 'neon_snow') {
-        // Frosty crystalline bells
         [587.33, 880, 1174.66, 1760].forEach((freq, idx) => {
           setTimeout(() => this.tone(freq, 0.22, 'sine', 0.12), idx * 80);
         });
       } else {
-        // Sunshine / clear chime
         [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
           setTimeout(() => this.tone(freq, 0.18, 'triangle', 0.14), idx * 70);
         });
       }
     } catch {}
+  }
+
+  // --- POLICE ESCORT POWER-UP AUDIO ---
+  public playPoliceEscortPowerUp() {
+    this.init();
+    if (this.isMuted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // High-energy fanfare chime + police radio alert
+      const fanfareNotes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+      fanfareNotes.forEach((f, i) => {
+        setTimeout(() => this.tone(f, 0.18, 'triangle', 0.22), i * 65);
+      });
+
+      // Quick dual escort siren chirp
+      setTimeout(() => {
+        if (!this.ctx || this.isMuted) return;
+        const sirenOsc = this.ctx.createOscillator();
+        const sirenGain = this.ctx.createGain();
+        const t = this.ctx.currentTime;
+        sirenOsc.type = 'sawtooth';
+        sirenOsc.frequency.setValueAtTime(700, t);
+        sirenOsc.frequency.linearRampToValueAtTime(1150, t + 0.18);
+        sirenOsc.frequency.linearRampToValueAtTime(700, t + 0.36);
+        sirenGain.gain.setValueAtTime(0.16, t);
+        sirenGain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+        sirenOsc.connect(sirenGain).connect(this.ctx.destination);
+        sirenOsc.start(t);
+        sirenOsc.stop(t + 0.4);
+      }, 350);
+    } catch {}
+  }
+
+  // --- DHAKA STREET HONKING & SPATIAL AUDIO SYSTEM ---
+  private pannerNode(pan: number): StereoPannerNode | GainNode | null {
+    if (!this.ctx) return null;
+    try {
+      if (typeof this.ctx.createStereoPanner === 'function') {
+        const panner = this.ctx.createStereoPanner();
+        panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), this.ctx.currentTime);
+        return panner;
+      }
+    } catch {}
+    return null;
+  }
+
+  /**
+   * Dhaka Bus Air Horn ("পোঁওও-পোঁও!")
+   * Iconic pneumatic dual blast (415Hz + 554Hz) with characteristic mechanical valve puff.
+   */
+  public playDhakaBusAirHorn(pan = 0, vol = 0.22) {
+    this.init();
+    if (this.isMuted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const panner = this.pannerNode(pan);
+      const frequencies = [392, 523.25, 784]; // G4, C5, G5 harmonic chord
+
+      frequencies.forEach((f) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(f, now);
+
+        // Double air-blast envelope
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(vol * 0.4, now + 0.04);
+        gain.gain.setValueAtTime(vol * 0.35, now + 0.16);
+        gain.gain.linearRampToValueAtTime(vol * 0.45, now + 0.20);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+
+        if (panner) {
+          osc.connect(gain).connect(panner).connect(this.ctx.destination);
+        } else {
+          osc.connect(gain).connect(this.ctx.destination);
+        }
+        osc.start(now);
+        osc.stop(now + 0.45);
+      });
+    } catch {}
+  }
+
+  /**
+   * Dhaka CNG Auto-Rickshaw Squeaky Horn ("পীপ-পীপ!")
+   * Fast staccato buzzing tweet typical of Bajaj 4-stroke / 2-stroke baby taxis.
+   */
+  public playCNGSqueakHorn(pan = 0, vol = 0.18) {
+    this.init();
+    if (this.isMuted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const panner = this.pannerNode(pan);
+
+      // Two quick sharp chirps
+      [0, 0.12].forEach((offset) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const t = now + offset;
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(840, t);
+        osc.frequency.linearRampToValueAtTime(880, t + 0.06);
+
+        gain.gain.setValueAtTime(vol, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+        if (panner) {
+          osc.connect(gain).connect(panner).connect(this.ctx.destination);
+        } else {
+          osc.connect(gain).connect(this.ctx.destination);
+        }
+        osc.start(t);
+        osc.stop(t + 0.09);
+      });
+    } catch {}
+  }
+
+  /**
+   * Standard Sedan / Taxi Horn
+   */
+  public playDhakaCarHorn(pan = 0, vol = 0.16) {
+    this.init();
+    if (this.isMuted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const panner = this.pannerNode(pan);
+      [440, 554.37].forEach((f) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, now);
+        gain.gain.setValueAtTime(vol * 0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        if (panner) {
+          osc.connect(gain).connect(panner).connect(this.ctx.destination);
+        } else {
+          osc.connect(gain).connect(this.ctx.destination);
+        }
+        osc.start(now);
+        osc.stop(now + 0.3);
+      });
+    } catch {}
+  }
+
+  /**
+   * Spatial traffic honk routed by relative vehicle coordinates
+   */
+  public playDhakaTrafficHorn(type: 'bus' | 'cng' | 'police' | 'car', relX: number, relZ: number) {
+    const dist = Math.hypot(relX, relZ);
+    if (dist > 50) return; // out of hearing range
+
+    const pan = Math.max(-0.85, Math.min(0.85, relX / 8));
+    const vol = Math.max(0.05, Math.min(0.3, (1 - dist / 50) * 0.28));
+
+    if (type === 'bus') {
+      this.playDhakaBusAirHorn(pan, vol);
+    } else if (type === 'cng') {
+      this.playCNGSqueakHorn(pan, vol);
+    } else if (type === 'police') {
+      this.playSiren();
+    } else {
+      this.playDhakaCarHorn(pan, vol);
+    }
   }
 
   public vibrate(ms: number) {
@@ -284,3 +446,4 @@ class TycoonAudioSystem {
 }
 
 export const sound = new TycoonAudioSystem();
+

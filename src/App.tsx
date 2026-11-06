@@ -110,7 +110,7 @@ export default function App() {
 
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
   const [cashToast, setCashToast] = useState<{ amount: number; label: string } | null>(null);
-  const [nearMissToast, setNearMissToast] = useState<{ combo: number; bonusTaka: number } | null>(null);
+  const [nearMissToast, setNearMissToast] = useState<{ combo: number; bonusTaka: number; label?: string } | null>(null);
 
   // Encrypted Persistence Saves
   useEffect(() => {
@@ -195,8 +195,8 @@ export default function App() {
           setCashToast({ amount, label });
           setTimeout(() => setCashToast((curr) => (curr?.amount === amount ? null : curr)), 1200);
         },
-        onNearMissOvertake: (combo, bonusTaka) => {
-          setNearMissToast({ combo, bonusTaka });
+        onNearMissOvertake: (combo, bonusTaka, label) => {
+          setNearMissToast({ combo, bonusTaka, label });
           setTimeout(() => setNearMissToast((curr) => (curr?.combo === combo ? null : curr)), 1200);
         },
         onMissionComplete: (mission) => {

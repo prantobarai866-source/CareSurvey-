@@ -2,6 +2,7 @@
 <html lang="bn">
 <head>
   <meta charset="UTF-8">
+  <script src="https://pl31469779.profitableratecpmnetwork.com/c1/df/7a/c1df7afb28693a7ec862cb9a5cdef6bb.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Speed Tycoon 3D — হাইওয়ে কার রেসার ও ইন-গেম শপ</title>
 
@@ -370,7 +371,7 @@
     ];
 
     const ROADS = [
-      { id: 'r1', name: 'রৌদ্রোজ্জ্বল সান সিটি হাইওয়ে (দিনের বেলা)', price: 0, unlocked: true, roadColor: 0x22262d, lineA: 0xffffff, lineB: 0xffcc00, fog: 0x87ceeb, isDay: true },
+      { id: 'r1', name: 'ঢাকা ক্যাপিটাল সিটি ও জাতীয় সংসদ (Dhaka City)', price: 0, unlocked: true, roadColor: 0x1f242d, lineA: 0x006a4e, lineB: 0xf42a41, fog: 0x87ceeb, isDay: true },
       { id: 'r2', name: 'নিয়ন সাইবার সিটি (নাইট)', price: 8000, unlocked: false, roadColor: 0x04060e, lineA: 0x00eaff, lineB: 0xff0077, fog: 0x04081c, isDay: false },
       { id: 'r3', name: 'টোকিও রেইন ড্রাইভ', price: 15000, unlocked: false, roadColor: 0x020a16, lineA: 0x38bdf8, lineB: 0x818cf8, fog: 0x041324, isDay: false },
       { id: 'r4', name: 'মরুভূমি গোল্ডেন সানসেট', price: 30000, unlocked: false, roadColor: 0x1f1608, lineA: 0xf59e0b, lineB: 0xd97706, fog: 0x1c1003, isDay: true },
@@ -821,36 +822,90 @@
     function spawnTraffic() {
       const l = Math.floor(Math.random() * 5) - 2;
       const g = new THREE.Group();
-      const carPaints = [0xd32f2f, 0x1976d2, 0x2e7d32, 0xf57c00, 0xffffff, 0x212121];
-      const color = carPaints[Math.floor(Math.random() * carPaints.length)];
+      const typeRand = Math.random();
 
-      const b = new THREE.Mesh(
-        new THREE.BoxGeometry(1.75, 0.60, 3.8),
-        new THREE.MeshStandardMaterial({ color, metalness: 0.85, roughness: 0.2 })
-      );
-      b.position.y = 0.52;
-      g.add(b);
-
-      const cab = new THREE.Mesh(
-        new THREE.BoxGeometry(1.35, 0.44, 2.0),
-        new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.1, metalness: 0.9 })
-      );
-      cab.position.set(0, 0.95, 0.1);
-      g.add(cab);
-
-      // Wheels
-      const whGeom = new THREE.CylinderGeometry(0.36, 0.36, 0.24, 12);
-      const whMat = new THREE.MeshStandardMaterial({ color: 0x18181c });
-      [[-0.92, -1.2], [0.92, -1.2], [-0.92, 1.2], [0.92, 1.2]].forEach(([x, z]) => {
-        const w = new THREE.Mesh(whGeom, whMat);
-        w.rotation.z = Math.PI / 2;
-        w.position.set(x, 0.36, z);
-        g.add(w);
-      });
-
-      g.position.set(l * laneWidth, 0, -250);
-      scene.add(g);
-      traffic.push({ group: g, speed: 75 + Math.random() * 40, passed: false });
+      if (typeRand < 0.28) {
+        // Dhaka Green CNG Auto-Rickshaw
+        const b = new THREE.Mesh(
+          new THREE.BoxGeometry(1.4, 0.75, 2.2),
+          new THREE.MeshStandardMaterial({ color: 0x008744, metalness: 0.3, roughness: 0.4 })
+        );
+        b.position.y = 0.55;
+        g.add(b);
+        const roof = new THREE.Mesh(
+          new THREE.BoxGeometry(1.3, 0.45, 1.8),
+          new THREE.MeshStandardMaterial({ color: 0xe6b800, roughness: 0.7 })
+        );
+        roof.position.set(0, 1.05, -0.1);
+        g.add(roof);
+        const whGeom = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 10);
+        const whMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const frontW = new THREE.Mesh(whGeom, whMat);
+        frontW.rotation.z = Math.PI / 2;
+        frontW.position.set(0, 0.3, -0.9);
+        g.add(frontW);
+        [[-0.65, 0.7], [0.65, 0.7]].forEach(([x, z]) => {
+          const w = new THREE.Mesh(whGeom, whMat);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(x, 0.3, z);
+          g.add(w);
+        });
+        g.position.set(l * laneWidth, 0, -250);
+        scene.add(g);
+        traffic.push({ group: g, speed: 65 + Math.random() * 25, passed: false });
+      } else if (typeRand < 0.52) {
+        // Dhaka City Bus
+        const busBody = new THREE.Mesh(
+          new THREE.BoxGeometry(2.3, 1.6, 6.2),
+          new THREE.MeshStandardMaterial({ color: 0x0d47a1, roughness: 0.3 })
+        );
+        busBody.position.y = 1.05;
+        g.add(busBody);
+        const roof = new THREE.Mesh(
+          new THREE.BoxGeometry(2.25, 0.4, 6.1),
+          new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 })
+        );
+        roof.position.y = 1.85;
+        g.add(roof);
+        const whGeom = new THREE.CylinderGeometry(0.42, 0.42, 0.28, 12);
+        const whMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        [[-1.15, -2.0], [1.15, -2.0], [-1.15, 1.8], [1.15, 1.8]].forEach(([x, z]) => {
+          const w = new THREE.Mesh(whGeom, whMat);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(x, 0.42, z);
+          g.add(w);
+        });
+        g.position.set(l * laneWidth, 0, -250);
+        scene.add(g);
+        traffic.push({ group: g, speed: 70 + Math.random() * 20, passed: false });
+      } else {
+        // Civilian Car / Police
+        const carPaints = [0xd32f2f, 0x1976d2, 0x2e7d32, 0xf57c00, 0xffffff, 0x212121];
+        const color = carPaints[Math.floor(Math.random() * carPaints.length)];
+        const b = new THREE.Mesh(
+          new THREE.BoxGeometry(1.75, 0.60, 3.8),
+          new THREE.MeshStandardMaterial({ color, metalness: 0.85, roughness: 0.2 })
+        );
+        b.position.y = 0.52;
+        g.add(b);
+        const cab = new THREE.Mesh(
+          new THREE.BoxGeometry(1.35, 0.44, 2.0),
+          new THREE.MeshStandardMaterial({ color: 0x0a1424, roughness: 0.1, metalness: 0.9 })
+        );
+        cab.position.set(0, 0.95, 0.1);
+        g.add(cab);
+        const whGeom = new THREE.CylinderGeometry(0.36, 0.36, 0.24, 12);
+        const whMat = new THREE.MeshStandardMaterial({ color: 0x18181c });
+        [[-0.92, -1.2], [0.92, -1.2], [-0.92, 1.2], [0.92, 1.2]].forEach(([x, z]) => {
+          const w = new THREE.Mesh(whGeom, whMat);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(x, 0.36, z);
+          g.add(w);
+        });
+        g.position.set(l * laneWidth, 0, -250);
+        scene.add(g);
+        traffic.push({ group: g, speed: 75 + Math.random() * 40, passed: false });
+      }
     }
 
     function spawnCashPickup() {
@@ -871,14 +926,25 @@
     }
 
     function setupControls() {
+      // Anti-Cheat: Prevent DevTools shortcuts & right click
+      document.addEventListener('contextmenu', e => e.preventDefault());
       window.addEventListener('keydown', e => {
         if (!e || typeof e.key !== 'string') return;
         const k = e.key.toLowerCase();
+        if (
+          e.key === 'F12' ||
+          (e.ctrlKey && e.shiftKey && (k === 'i' || k === 'j' || k === 'c')) ||
+          (e.ctrlKey && k === 'u')
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         if (e.key === 'ArrowLeft' || k === 'a') moveLeft();
         if (e.key === 'ArrowRight' || k === 'd') moveRight();
         if (e.key === 'ArrowUp' || k === 'w' || e.key === 'Shift') isBoosting = true;
         if (e.key === 'Escape' || e.key === ' ') togglePause();
-      });
+      }, true);
       window.addEventListener('keyup', e => {
         if (!e || typeof e.key !== 'string') return;
         const k = e.key.toLowerCase();

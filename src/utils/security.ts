@@ -1,18 +1,19 @@
 /**
- * Tamper-protection & encrypted storage utility for Speed Tycoon
- * Protects localStorage data against inspection/unauthorized edits in browser devtools.
+ * Tamper-protection & encrypted storage utility for Speed Tycoon 3D (Dhaka Edition)
+ * Protects localStorage data and runtime memory against devtools inspection, speedhacks, and unauthorized edits.
  */
 
-const SALT = 'ST3D_SECURE_HASH_v5_BN_';
+const SALT = 'ST3D_DHAKA_SECURE_HASH_v6_BGD_';
 
 function simpleHash(str: string): string {
-  let hash = 0;
+  let hash1 = 5381;
+  let hash2 = 52711;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
+    hash1 = (hash1 * 33) ^ char;
+    hash2 = (hash2 * 33) ^ char;
   }
-  return (hash >>> 0).toString(36);
+  return (Math.abs(hash1) >>> 0).toString(36) + (Math.abs(hash2) >>> 0).toString(36);
 }
 
 function scramble(data: string): string {
@@ -40,7 +41,6 @@ export function saveSecure(key: string, value: any): void {
     const payload = JSON.stringify({ d: scramble(raw), c: checksum, t: Date.now() });
     localStorage.setItem(key, payload);
   } catch {
-    // fallback
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {}
@@ -52,7 +52,6 @@ export function loadSecure<T>(key: string, fallback: T): T {
     const rawItem = localStorage.getItem(key);
     if (!rawItem) return fallback;
 
-    // Check if it's the secured payload
     if (rawItem.startsWith('{"d":') && rawItem.includes('"c":')) {
       const parsed = JSON.parse(rawItem);
       const decoded = unscramble(parsed.d);
@@ -61,13 +60,11 @@ export function loadSecure<T>(key: string, fallback: T): T {
       if (parsed.c === expectedChecksum) {
         return JSON.parse(decoded) as T;
       } else {
-        // Tampered! Reset to safe value
-        console.warn(`[Security] Data tampering detected on ${key}. Restoring default.`);
+        console.warn(`[Security Alert] Data tampering detected on ${key}. Auto-resetting to safe default.`);
         return fallback;
       }
     }
 
-    // Migration from old unencrypted version
     const old = JSON.parse(rawItem);
     return old as T;
   } catch {
@@ -76,24 +73,49 @@ export function loadSecure<T>(key: string, fallback: T): T {
 }
 
 /**
+ * Validates any cash increment to prevent memory injection attacks.
+ */
+export function sanitizeCash(amount: number, maxAllowed = 100000): number {
+  if (typeof amount !== 'number' || isNaN(amount) || !isFinite(amount) || amount < 0) {
+    return 0;
+  }
+  return Math.min(amount, maxAllowed);
+}
+
+/**
  * Setup anti-tampering guards on browser window:
- * - Freezes crucial cheat hooks
- * - Disables inspect shortcut / right click inside game iFrame
+ * - Disables inspect shortcuts (F12, Ctrl+Shift+I/J/C, Ctrl+U)
+ * - Disables right-click context menu
+ * - Freezes cheat identifiers
  */
 export function initAntiCheatGuards(): void {
   if (typeof window === 'undefined') return;
 
-  // Prevent right-click context menu on canvas
+  // Prevent right-click context menu
   window.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-  });
+  }, { capture: true });
 
-  // Freeze global identifiers if anyone tries to inject
+  // Prevent developer shortcuts
+  window.addEventListener('keydown', (e) => {
+    if (
+      e.key === 'F12' ||
+      (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+      (e.ctrlKey && (e.key === 'U' || e.key === 'u'))
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, { capture: true });
+
+  // Lock tamper-proof variables in global scope
   try {
-    Object.defineProperty(window, '_speedTycoonCheats', {
-      value: undefined,
-      writable: false,
-      configurable: false,
+    ['_speedTycoonCheats', 'hackWallet', 'giveCash', 'setSpeed'].forEach((prop) => {
+      Object.defineProperty(window, prop, {
+        value: undefined,
+        writable: false,
+        configurable: false,
+      });
     });
   } catch {}
 }

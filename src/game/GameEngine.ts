@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CarConfig, GameStats, CashMission, RoadTheme, GlobalUpgrades, DynamicWeatherType, WeatherState } from '../types/game';
 import { sound } from '../audio/sound';
 import { INITIAL_MISSIONS, INITIAL_ROAD_THEMES, INITIAL_UPGRADES } from '../data/cars';
+import { DhakaLandmarks } from './DhakaLandmarks';
 
 interface TrafficCar {
   group: THREE.Group;
@@ -13,11 +14,12 @@ interface TrafficCar {
   cycle: number;
   width: number;
   length: number;
+  vehicleType?: 'cng' | 'bus' | 'police' | 'car';
 }
 
 interface CashPickup {
   group: THREE.Group;
-  type: 'cash_bundle' | 'gold_coin' | 'nitro' | 'shield';
+  type: 'cash_bundle' | 'gold_coin' | 'nitro' | 'shield' | 'police_escort';
   lane: number;
   z: number;
   value: number;
@@ -64,6 +66,22 @@ export class GameEngine {
   private stars: THREE.Points | null = null;
   private weatherParticles: THREE.Points | null = null;
   private weatherPositions: Float32Array | null = null;
+
+  // Dhaka Scenery, Metro Rail & Overhead Signboards
+  private metroRailPillars: THREE.Group[] = [];
+  private metroTrain: THREE.Group | null = null;
+  private overheadSignboards: THREE.Group[] = [];
+  private dhakaLandmarks: THREE.Group[] = [];
+
+  // Security Patrol: Police Escort Mechanic
+  public policeEscortTimer = 0;
+  private escortAuraMesh: THREE.Mesh | null = null;
+  private escortLightR: THREE.PointLight | null = null;
+  private escortLightB: THREE.PointLight | null = null;
+
+  // Localized Spatial Audio & Street Honking
+  private dhakaHonkTimer = 2.0;
+  private spatialAudioTimer = 0;
 
   // Dynamic Weather Engine
   public currentWeatherType: DynamicWeatherType = 'clear';
@@ -125,7 +143,7 @@ export class GameEngine {
   private onStatsUpdate: (stats: GameStats) => void;
   private onCrash: () => void;
   private onCashCollected: (amount: number, label: string) => void;
-  private onNearMissOvertake: (combo: number, bonusTaka: number) => void;
+  private onNearMissOvertake: (combo: number, bonusTaka: number, label?: string) => void;
   private onMissionComplete: (mission: CashMission) => void;
 
   constructor(
@@ -137,7 +155,7 @@ export class GameEngine {
       onStatsUpdate: (stats: GameStats) => void;
       onCrash: () => void;
       onCashCollected: (amount: number, label: string) => void;
-      onNearMissOvertake: (combo: number, bonusTaka: number) => void;
+      onNearMissOvertake: (combo: number, bonusTaka: number, label?: string) => void;
       onMissionComplete: (mission: CashMission) => void;
     }
   ) {
@@ -251,6 +269,10 @@ export class GameEngine {
     this.updateWeatherTargets();
     this.buildSky();
     this.buildWeatherParticles();
+    this.buildCity();
+    this.buildDhakaMetroRail();
+    this.buildDhakaSignboards();
+    this.buildDhakaLandmarks();
   }
 
   private buildSky() {
@@ -260,7 +282,7 @@ export class GameEngine {
     if (this.sunMesh) { this.scene.remove(this.sunMesh); this.sunMesh = null; }
     if (this.cloudsGroup) { this.scene.remove(this.cloudsGroup); this.cloudsGroup = null; }
 
-    const isDaytime = this.currentTheme.skyType === 'daytime';
+    const isDaytime = this.currentTheme.skyType === 'daytime' || this.currentTheme.skyType === 'dhaka_city';
 
     if (isDaytime) {
       // 1. Realistic Clear Daytime Gradient Sky Dome
@@ -818,11 +840,272 @@ export class GameEngine {
           }
         }
 
+        // 3. Bengali Commercial Rooftop Billboard on select roadside towers
+        if (Math.random() < 0.28) {
+          const ads = [
+            { title: 'বিকাশ', sub: 'সবচেয়ে সহজ পেমেন্ট', bg: '#db2777', text: '#ffffff' },
+            { title: 'গ্রামীণফোন', sub: 'চলো বহুদূর', bg: '#0284c7', text: '#ffffff' },
+            { title: 'বাংলালিংক ৪জি', sub: 'ডিজিটাল কানেক্টিভিটি', bg: '#ea580c', text: '#ffffff' },
+            { title: 'প্রাণ ফ্রুটো', sub: '১০০% ফ্রেশ ম্যাঙ্গো জুস', bg: '#dc2626', text: '#fef08a' },
+            { title: 'ওয়ালটন', sub: 'আমাদের নিজস্ব পণ্য', bg: '#2563eb', text: '#ffffff' },
+          ];
+          const ad = ads[Math.floor(Math.random() * ads.length)];
+          const bCanvas = document.createElement('canvas');
+          bCanvas.width = 256;
+          bCanvas.height = 128;
+          const bCtx = bCanvas.getContext('2d');
+          if (bCtx) {
+            bCtx.fillStyle = ad.bg;
+            bCtx.fillRect(0, 0, 256, 128);
+            bCtx.strokeStyle = '#ffffff';
+            bCtx.lineWidth = 6;
+            bCtx.strokeRect(4, 4, 248, 120);
+            bCtx.fillStyle = ad.text;
+            bCtx.font = 'bold 36px "Hind Siliguri", sans-serif';
+            bCtx.textAlign = 'center';
+            bCtx.fillText(ad.title, 128, 55);
+            bCtx.font = 'bold 18px "Hind Siliguri", sans-serif';
+            bCtx.fillText(ad.sub, 128, 95);
+          }
+          const bb = new THREE.Mesh(
+            new THREE.PlaneGeometry(14, 7),
+            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bCanvas), side: THREE.DoubleSide })
+          );
+          bb.position.set(0, h + 3.8, -d / 2 - 0.2);
+          group.add(bb);
+        }
+
         group.position.set(side * (28 + Math.random() * 32), 0, z + Math.random() * 10);
         this.scene.add(group);
         this.buildings.push(group);
       });
     }
+  }
+
+  // --- DHAKA METRO RAIL (MRT LINE-6 VIADUCT & TRAIN) ---
+  private buildDhakaMetroRail() {
+    this.metroRailPillars.forEach((p) => this.scene.remove(p));
+    this.metroRailPillars = [];
+    if (this.metroTrain) {
+      this.scene.remove(this.metroTrain);
+      this.metroTrain = null;
+    }
+
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.85, metalness: 0.1 });
+    const trackMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.7, metalness: 0.3 });
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9, roughness: 0.2 });
+
+    const viaductX = -17.5; // Elevated on left side of highway
+    const trackY = 9.8;
+
+    for (let z = -1200; z < 100; z += 35) {
+      const g = new THREE.Group();
+
+      // Concrete Column Pier
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, trackY, 12), pillarMat);
+      col.position.set(0, trackY / 2, 0);
+      g.add(col);
+
+      // Hammerhead Crossbeam Pier Cap
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.1, 2.2), pillarMat);
+      beam.position.set(0, trackY + 0.3, 0);
+      g.add(beam);
+
+      // Guideway Slab
+      const girder = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.8, 35.5), trackMat);
+      girder.position.set(0, trackY + 1.1, 0);
+      g.add(girder);
+
+      // Green & White Dhaka MRT Side Crash Barriers
+      [-2.1, 2.1].forEach((gx) => {
+        const railWall = new THREE.Mesh(
+          new THREE.BoxGeometry(0.2, 0.9, 35.5),
+          new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.5 })
+        );
+        railWall.position.set(gx, trackY + 1.8, 0);
+        g.add(railWall);
+      });
+
+      // Steel Tracks
+      [-0.8, 0.8].forEach((rx) => {
+        const rTrack = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 35.5), railMat);
+        rTrack.position.set(rx, trackY + 1.6, 0);
+        g.add(rTrack);
+      });
+
+      g.position.set(viaductX, 0, z);
+      this.scene.add(g);
+      this.metroRailPillars.push(g);
+    }
+
+    // Dhaka MRT Line-6 Train (৪ বগির আধুনিক মেট্রোরেল)
+    const trainGroup = new THREE.Group();
+    const trainLength = 52;
+    const trainWidth = 3.2;
+    const trainHeight = 2.8;
+
+    const silverBodyMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.85, roughness: 0.2 });
+    const greenRibbonMat = new THREE.MeshBasicMaterial({ color: 0x059669 });
+    const redRibbonMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
+    const trainGlassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 });
+
+    const carLen = 12.2;
+    for (let c = 0; c < 4; c++) {
+      const cz = (c - 1.5) * (carLen + 0.8);
+      const carGroup = new THREE.Group();
+
+      const shell = new THREE.Mesh(new THREE.BoxGeometry(trainWidth, trainHeight, carLen), silverBodyMat);
+      shell.position.y = trainHeight / 2;
+      carGroup.add(shell);
+
+      const gStripe = new THREE.Mesh(new THREE.BoxGeometry(trainWidth + 0.04, 0.45, carLen + 0.02), greenRibbonMat);
+      gStripe.position.y = 1.1;
+      carGroup.add(gStripe);
+
+      const rStripe = new THREE.Mesh(new THREE.BoxGeometry(trainWidth + 0.05, 0.25, carLen + 0.03), redRibbonMat);
+      rStripe.position.y = 0.7;
+      carGroup.add(rStripe);
+
+      const win = new THREE.Mesh(new THREE.BoxGeometry(trainWidth + 0.06, 0.75, carLen * 0.85), trainGlassMat);
+      win.position.y = 1.85;
+      carGroup.add(win);
+
+      const acPod = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, carLen * 0.5), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+      acPod.position.y = trainHeight + 0.2;
+      carGroup.add(acPod);
+
+      carGroup.position.z = cz;
+      trainGroup.add(carGroup);
+    }
+
+    // Aerodynamic Nose on front cab
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.2, 4), silverBodyMat);
+    nose.rotation.x = -Math.PI / 2;
+    nose.rotation.y = Math.PI / 4;
+    nose.position.set(0, trainHeight / 2, -trainLength / 2 - 0.9);
+    trainGroup.add(nose);
+
+    // Dual Front LED Headlights
+    [-0.8, 0.8].forEach((lx) => {
+      const hl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      hl.position.set(lx, 1.2, -trainLength / 2 - 1.2);
+      trainGroup.add(hl);
+    });
+
+    trainGroup.position.set(viaductX, trackY + 1.6, -180);
+    this.scene.add(trainGroup);
+    this.metroTrain = trainGroup;
+  }
+
+  // --- HIGHWAY OVERHEAD BENGALI GANTRY SIGNBOARDS ---
+  private buildDhakaSignboards() {
+    this.overheadSignboards.forEach((s) => this.scene.remove(s));
+    this.overheadSignboards = [];
+
+    const boardTexts = [
+      { top: 'স্বাগতম ঢাকা শহর', sub: 'WELCOME TO DHAKA METRO EXPRESSWAY', dirL: '⇖ মতিঝিল • ফার্মগেট', dirR: 'হাতিরঝিল ➜' },
+      { top: 'ঢাকা এলিভেটেড এক্সপ্রেসওয়ে', sub: 'DHAKA ELEVATED EXPRESSWAY', dirL: '⇖ মিরপুর ১০ • বিমানবন্দর', dirR: 'উত্তরা ➜' },
+      { top: 'মেট্রোরেল রুট এমআরটি লাইন-৬', sub: 'MRT LINE-6 HIGH SPEED CORRIDOR', dirL: '⇖ বিজয় সরণি • তেজগাঁও', dirR: 'শাহবাগ ➜' },
+      { top: 'নিরাপদ সড়ক, সুন্দর জীবন', sub: 'SPEED LIMIT: 80 KM/H | DRIVE SAFELY', dirL: '⇖ গুলশান • বনানী', dirR: 'ধানমন্ডি ➜' },
+    ];
+
+    const trussMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
+
+    for (let i = 0; i < 4; i++) {
+      const z = -200 - i * 280;
+      const g = new THREE.Group();
+
+      [-16, 16].forEach((tx) => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 8.5, 8), trussMat);
+        post.position.set(tx, 4.25, 0);
+        g.add(post);
+      });
+
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(32.5, 0.5, 0.6), trussMat);
+      beam.position.set(0, 7.8, 0);
+      g.add(beam);
+
+      const data = boardTexts[i % boardTexts.length];
+      const canvas = document.createElement('canvas');
+      canvas.width = 768;
+      canvas.height = 200;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#047857'; // Highway Green
+        ctx.fillRect(0, 0, 768, 200);
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 10;
+        ctx.strokeRect(8, 8, 752, 184);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px "Hind Siliguri", "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(data.top, 384, 52);
+
+        ctx.fillStyle = '#fef08a';
+        ctx.font = 'bold 20px "Orbitron", sans-serif';
+        ctx.fillText(data.sub, 384, 88);
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(30, 110);
+        ctx.lineTo(738, 110);
+        ctx.stroke();
+
+        ctx.font = 'bold 28px "Hind Siliguri", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'left';
+        ctx.fillText(data.dirL, 50, 155);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(data.dirR, 718, 155);
+      }
+
+      const boardTex = new THREE.CanvasTexture(canvas);
+      const board = new THREE.Mesh(
+        new THREE.PlaneGeometry(16, 4.2),
+        new THREE.MeshBasicMaterial({ map: boardTex, side: THREE.DoubleSide })
+      );
+      board.position.set(0, 6.2, -0.05);
+      g.add(board);
+
+      g.position.set(0, 0, z);
+      this.scene.add(g);
+      this.overheadSignboards.push(g);
+    }
+  }
+
+  // --- DHAKA CITY ICONIC 3D LANDMARKS (PARLIAMENT, DHAKA GATE, SHAHEED MINAR) ---
+  private buildDhakaLandmarks() {
+    this.dhakaLandmarks.forEach((lm) => this.scene.remove(lm));
+    this.dhakaLandmarks = [];
+
+    const isDhaka =
+      this.currentTheme.skyType === 'dhaka_city' ||
+      this.currentTheme.hasDhakaLandmarks ||
+      this.currentTheme.id.includes('dhaka');
+
+    if (!isDhaka) return;
+
+    // 1. National Parliament House (জাতীয় সংসদ ভবন) on right roadside crescent lake
+    const parliament = DhakaLandmarks.createParliamentHouse();
+    parliament.position.set(72, 0, -320);
+    this.scene.add(parliament);
+    this.dhakaLandmarks.push(parliament);
+
+    // 2. Mir Jumla's Historic Dhaka Gate (মীর জুমলার ঢাকা গেট) on left historic parkway
+    const dhakaGate = DhakaLandmarks.createDhakaGate();
+    dhakaGate.position.set(-44, 0, -780);
+    this.scene.add(dhakaGate);
+    this.dhakaLandmarks.push(dhakaGate);
+
+    // 3. Central Shaheed Minar (কেন্দ্রীয় শহীদ মিনার) on right memorial plaza
+    const shaheedMinar = DhakaLandmarks.createShaheedMinar();
+    shaheedMinar.position.set(64, 0, -1220);
+    this.scene.add(shaheedMinar);
+    this.dhakaLandmarks.push(shaheedMinar);
   }
 
   private buildPlayerCar() {
@@ -982,59 +1265,315 @@ export class GameEngine {
     this.shieldMesh.visible = this.shields > 0;
     group.add(this.shieldMesh);
 
+    // Security Patrol Police Escort Aura & Lightbars
+    const escortAura = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.4, 2.4, 1.4, 16, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.45,
+        wireframe: true,
+        side: THREE.DoubleSide,
+      })
+    );
+    escortAura.position.y = 0.7;
+    escortAura.visible = this.policeEscortTimer > 0;
+    group.add(escortAura);
+    this.escortAuraMesh = escortAura;
+
+    const escortLightR = new THREE.PointLight(0xff0044, 0, 15);
+    escortLightR.position.set(-0.5, 1.4, 0);
+    group.add(escortLightR);
+    this.escortLightR = escortLightR;
+
+    const escortLightB = new THREE.PointLight(0x0088ff, 0, 15);
+    escortLightB.position.set(0.5, 1.4, 0);
+    group.add(escortLightB);
+    this.escortLightB = escortLightB;
+
     group.position.set(0, 0, 3);
     this.scene.add(group);
     this.playerGroup = group;
   }
 
-  // --- TRAFFIC SPAWNER ---
-  private spawnTraffic() {
-    const lane = Math.floor(Math.random() * 5) - 2;
-    const isPolice = !this.policeActive && Math.random() < 0.18;
+  // --- DHAKA TRAFFIC VEHICLE BUILDERS ---
+  private createCNGAutoRickshaw(): THREE.Group {
     const group = new THREE.Group();
+    const w = 1.35;
+    const h = 1.45;
+    const l = 2.6;
 
-    // Random realistic vehicle paint colors
-    const carPaints = [0xd32f2f, 0x1976d2, 0x2e7d32, 0xf57c00, 0x212121, 0xffffff, 0x7b1fa2];
-    const color = isPolice ? 0x0f172a : carPaints[Math.floor(Math.random() * carPaints.length)];
-    const isSUV = !isPolice && Math.random() > 0.6;
+    // Green Metallic Lower Chassis
+    const cngGreenMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.35, metalness: 0.5 });
+    const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(w, 0.65, l), cngGreenMat);
+    lowerBody.position.y = 0.52;
+    group.add(lowerBody);
 
+    // Front Slanted Nose Apron
+    const frontApron = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.55, 0.7), cngGreenMat);
+    frontApron.position.set(0, 0.58, -l / 2 - 0.15);
+    frontApron.rotation.x = 0.25;
+    group.add(frontApron);
+
+    // Yellow Canvas Curved Roof
+    const yellowRoofMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.75, metalness: 0.1 });
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 1.02, 0.35, l * 0.75), yellowRoofMat);
+    roof.position.set(0, h + 0.1, 0.1);
+    group.add(roof);
+
+    // Side Protective Wire Safety Mesh (Signature Dhaka CNG look!)
+    const grillMat = new THREE.MeshBasicMaterial({ color: 0x1e293b, wireframe: true });
+    [-w / 2 - 0.02, w / 2 + 0.02].forEach((sx) => {
+      const grill = new THREE.Mesh(new THREE.PlaneGeometry(l * 0.7, 0.65), grillMat);
+      grill.rotation.y = sx < 0 ? Math.PI / 2 : -Math.PI / 2;
+      grill.position.set(sx, 0.95, 0.1);
+      group.add(grill);
+    });
+
+    // Front Windshield
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 });
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.85, 0.55), glassMat);
+    windshield.position.set(0, 0.98, -l * 0.35);
+    windshield.rotation.x = 0.18;
+    group.add(windshield);
+
+    // Front Single Center Headlight
+    const headlight = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfffbeb }));
+    headlight.position.set(0, 0.65, -l / 2 - 0.45);
+    group.add(headlight);
+
+    // Rear Taillights
+    [-0.45, 0.45].forEach((tx) => {
+      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.06), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+      tl.position.set(tx, 0.55, l / 2 + 0.02);
+      group.add(tl);
+    });
+
+    // 3 Wheels (1 Front Center, 2 Rear)
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 });
+
+    // Front Wheel
+    const fwGroup = new THREE.Group();
+    const fTire = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.14, 12), tireMat);
+    fTire.rotation.z = Math.PI / 2;
+    fwGroup.add(fTire);
+    const fRim = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.16, 10), rimMat);
+    fRim.rotation.z = Math.PI / 2;
+    fwGroup.add(fRim);
+    fwGroup.position.set(0, 0.24, -l * 0.38);
+    group.add(fwGroup);
+
+    // Rear Wheels
+    [-w / 2, w / 2].forEach((rwX) => {
+      const rwGroup = new THREE.Group();
+      const rTire = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.16, 12), tireMat);
+      rTire.rotation.z = Math.PI / 2;
+      rwGroup.add(rTire);
+      const rRim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.18, 10), rimMat);
+      rRim.rotation.z = Math.PI / 2;
+      rwGroup.add(rRim);
+      rwGroup.position.set(rwX, 0.28, l * 0.28);
+      group.add(rwGroup);
+    });
+
+    return group;
+  }
+
+  private createDhakaCityBus(): THREE.Group {
+    const group = new THREE.Group();
+    const w = 2.4;
+    const l = 7.6;
+
+    const isRedBus = Math.random() > 0.5;
+    const primaryColor = isRedBus ? 0xdc2626 : 0x0284c7; // Red or Blue
+    const secondaryColor = isRedBus ? 0xf8fafc : 0xfacc15; // White or Yellow
+
+    const busBodyMat = new THREE.MeshStandardMaterial({ color: primaryColor, roughness: 0.3, metalness: 0.4 });
+    const busStripeMat = new THREE.MeshStandardMaterial({ color: secondaryColor, roughness: 0.35, metalness: 0.3 });
+
+    // Lower Main Body
+    const lower = new THREE.Mesh(new THREE.BoxGeometry(w, 1.25, l), busBodyMat);
+    lower.position.y = 0.95;
+    group.add(lower);
+
+    // Horizontal Accent Stripe
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.35, l + 0.02), busStripeMat);
+    stripe.position.y = 1.05;
+    group.add(stripe);
+
+    // Cabin Windows
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 });
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(w * 0.95, 0.9, l * 0.92), glassMat);
+    cabin.position.set(0, 1.95, 0);
+    group.add(cabin);
+
+    // Roof
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, 0.18, l * 0.94), busBodyMat);
+    roof.position.set(0, 2.45, 0);
+    group.add(roof);
+
+    // Route Signboard Canvas (মিরপুর ⇄ মতিঝিল / উত্তরা ⇄ ফার্মগেট)
+    const routes = ['মিরপুর ১০ ⇄ মতিঝিল', 'উত্তরা ⇄ ফার্মগেট', 'গুলিস্তান ⇄ বনানী'];
+    const routeText = routes[Math.floor(Math.random() * routes.length)];
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, 256, 64);
+      ctx.fillStyle = '#fde047';
+      ctx.font = 'bold 22px "Hind Siliguri", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(routeText, 128, 42);
+    }
+    const routeTex = new THREE.CanvasTexture(canvas);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.45), new THREE.MeshBasicMaterial({ map: routeTex }));
+    sign.position.set(0, 2.2, -l / 2 - 0.04);
+    group.add(sign);
+
+    // Headlights
+    [-0.8, 0.8].forEach((bx) => {
+      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.18, 0.08), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      hl.position.set(bx, 0.75, -l / 2 - 0.04);
+      group.add(hl);
+    });
+
+    // Tall Rear Taillights
+    [-0.85, 0.85].forEach((tx) => {
+      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.08), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+      tl.position.set(tx, 1.2, l / 2 + 0.04);
+      group.add(tl);
+    });
+
+    // 6 Wheels (2 front, 4 dual rear)
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9 });
+    const wheelGeom = new THREE.CylinderGeometry(0.48, 0.48, 0.28, 14);
+
+    [
+      [-w / 2 - 0.05, -2.4], [w / 2 + 0.05, -2.4],
+      [-w / 2 - 0.05, 1.8], [w / 2 + 0.05, 1.8],
+      [-w / 2 - 0.05, 2.9], [w / 2 + 0.05, 2.9],
+    ].forEach(([wx, wz]) => {
+      const wg = new THREE.Group();
+      const t = new THREE.Mesh(wheelGeom, tireMat);
+      t.rotation.z = Math.PI / 2;
+      wg.add(t);
+      const r = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.30, 12), rimMat);
+      r.rotation.z = Math.PI / 2;
+      wg.add(r);
+      wg.position.set(wx, 0.48, wz);
+      group.add(wg);
+    });
+
+    return group;
+  }
+
+  private createPoliceCar(): { group: THREE.Group; lights: { r: THREE.PointLight; b: THREE.PointLight } } {
+    const group = new THREE.Group();
+    const w = 1.78;
+    const h = 0.65;
+    const l = 4.0;
+
+    // Bangladesh Police White Body
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.85, roughness: 0.2 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), bodyMat);
+    body.position.y = h / 2 + 0.22;
+    group.add(body);
+
+    // Navy Blue Side Stripe
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.3 });
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.18, l * 0.95), stripeMat);
+    stripe.position.y = body.position.y + 0.05;
+    group.add(stripe);
+
+    // Windshield & Glass
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.9, roughness: 0.1 });
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(w * 0.85, 0.45, l * 0.52), glassMat);
+    cab.position.set(0, body.position.y + h / 2 + 0.2, 0.1);
+    group.add(cab);
+
+    // Roof
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 0.82, 0.06, l * 0.46), bodyMat);
+    roof.position.set(0, cab.position.y + 0.24, 0.1);
+    group.add(roof);
+
+    // Police Roof Lightbar
+    const barBase = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.10, 0.24), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+    barBase.position.set(0, roof.position.y + 0.06, 0.1);
+    group.add(barBase);
+
+    const redLight = new THREE.PointLight(0xff0000, 2.5, 12);
+    redLight.position.set(-0.35, roof.position.y + 0.14, 0.1);
+    group.add(redLight);
+
+    const blueLight = new THREE.PointLight(0x0055ff, 2.5, 12);
+    blueLight.position.set(0.35, roof.position.y + 0.14, 0.1);
+    group.add(blueLight);
+
+    // Headlights & Taillights
+    [-w * 0.35, w * 0.35].forEach((hx) => {
+      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.08), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      hl.position.set(hx, body.position.y, -l / 2 - 0.04);
+      group.add(hl);
+
+      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.10, 0.08), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+      tl.position.set(hx, body.position.y + 0.05, l / 2 + 0.04);
+      group.add(tl);
+    });
+
+    // 4 Wheels
+    const whGeom = new THREE.CylinderGeometry(0.36, 0.36, 0.24, 14);
+    const whMat = new THREE.MeshStandardMaterial({ color: 0x18181c, roughness: 0.7 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.9 });
+
+    [[-w / 2 - 0.08, -1.2], [w / 2 + 0.08, -1.2], [-w / 2 - 0.08, 1.2], [w / 2 + 0.08, 1.2]].forEach(([wx, wz]) => {
+      const wg = new THREE.Group();
+      const tire = new THREE.Mesh(whGeom, whMat);
+      tire.rotation.z = Math.PI / 2;
+      wg.add(tire);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.26, 12), rimMat);
+      rim.rotation.z = Math.PI / 2;
+      wg.add(rim);
+      wg.position.set(wx, 0.36, wz);
+      group.add(wg);
+    });
+
+    return { group, lights: { r: redLight, b: blueLight } };
+  }
+
+  private createCivilianCar(color: number, isSUV: boolean): THREE.Group {
+    const group = new THREE.Group();
     const w = isSUV ? 1.85 : 1.72;
     const h = isSUV ? 0.78 : 0.60;
     const l = isSUV ? 4.1 : 3.8;
 
-    // Chassis & Main Body
     const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.85, roughness: 0.2 });
     const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), bodyMat);
     body.position.y = h / 2 + 0.22;
     group.add(body);
 
-    // Windshield & Glass Cabin
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.9, roughness: 0.1 });
     const cabHeight = isSUV ? 0.55 : 0.44;
     const cab = new THREE.Mesh(new THREE.BoxGeometry(w * 0.85, cabHeight, l * 0.55), glassMat);
     cab.position.set(0, body.position.y + h / 2 + cabHeight / 2 - 0.05, 0.1);
     group.add(cab);
 
-    // Roof
     const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 0.82, 0.06, l * 0.48), bodyMat);
     roof.position.set(0, cab.position.y + cabHeight / 2 + 0.02, 0.1);
     group.add(roof);
 
-    // Headlights
     [-w * 0.35, w * 0.35].forEach((hx) => {
       const hl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.08), new THREE.MeshBasicMaterial({ color: 0xffffff }));
       hl.position.set(hx, body.position.y, -l / 2 - 0.04);
       group.add(hl);
-    });
 
-    // Taillights
-    [-w * 0.35, w * 0.35].forEach((tx) => {
       const tl = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.10, 0.08), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-      tl.position.set(tx, body.position.y + 0.05, l / 2 + 0.04);
+      tl.position.set(hx, body.position.y + 0.05, l / 2 + 0.04);
       group.add(tl);
     });
 
-    // 4 Wheels
     const whGeom = new THREE.CylinderGeometry(0.36, 0.36, 0.24, 14);
     const whMat = new THREE.MeshStandardMaterial({ color: 0x18181c, roughness: 0.7 });
     const rimMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 });
@@ -1047,27 +1586,59 @@ export class GameEngine {
       const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.26, 12), rimMat);
       rim.rotation.z = Math.PI / 2;
       wg.add(rim);
-
       wg.position.set(wx, 0.36, wz);
       group.add(wg);
     });
 
+    return group;
+  }
+
+  // --- TRAFFIC SPAWNER (DHAKA VEHICLES) ---
+  private spawnTraffic() {
+    const lane = Math.floor(Math.random() * 5) - 2;
+    const isPolice = !this.policeActive && Math.random() < 0.16;
+
+    let group: THREE.Group;
+    let w = 1.75;
+    let h = 0.65;
+    let l = 3.9;
+    let vehicleSpeed = 70 + Math.random() * 45;
     let lights: { r: THREE.PointLight; b: THREE.PointLight } | undefined;
+    let vehicleType: 'cng' | 'bus' | 'police' | 'car' = 'car';
+
     if (isPolice) {
-      // Police Roof Lightbar
-      const barBase = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.25), new THREE.MeshStandardMaterial({ color: 0x050508 }));
-      barBase.position.set(0, roof.position.y + 0.08, 0.1);
-      group.add(barBase);
-
-      const redLight = new THREE.PointLight(0xff0000, 2.5, 10);
-      redLight.position.set(-0.35, roof.position.y + 0.15, 0.1);
-      group.add(redLight);
-
-      const blueLight = new THREE.PointLight(0x0055ff, 2.5, 10);
-      blueLight.position.set(0.35, roof.position.y + 0.15, 0.1);
-      group.add(blueLight);
-
-      lights = { r: redLight, b: blueLight };
+      vehicleType = 'police';
+      const policeRes = this.createPoliceCar();
+      group = policeRes.group;
+      lights = policeRes.lights;
+      w = 1.78; h = 0.68; l = 4.0;
+      vehicleSpeed = 90 + Math.random() * 35;
+    } else {
+      const typeRoll = Math.random();
+      if (typeRoll < 0.35) {
+        // Green CNG Auto-Rickshaw (ঢাকার ঐতিহ্যবাহী সিএনজি)
+        vehicleType = 'cng';
+        group = this.createCNGAutoRickshaw();
+        w = 1.35; h = 1.45; l = 2.6;
+        vehicleSpeed = 60 + Math.random() * 25;
+      } else if (typeRoll < 0.62) {
+        // Dhaka City Bus (মিরপুর/মতিঝিল সিটি বাস)
+        vehicleType = 'bus';
+        group = this.createDhakaCityBus();
+        w = 2.4; h = 2.3; l = 7.6;
+        vehicleSpeed = 55 + Math.random() * 25;
+      } else {
+        // Civilian Private Car / Microbus
+        vehicleType = 'car';
+        const isSUV = Math.random() > 0.55;
+        const paints = [0xd32f2f, 0x1976d2, 0xf8fafc, 0xf59e0b, 0x1e293b, 0x475569];
+        const carPaint = paints[Math.floor(Math.random() * paints.length)];
+        group = this.createCivilianCar(carPaint, isSUV);
+        w = isSUV ? 1.85 : 1.72;
+        h = isSUV ? 0.78 : 0.60;
+        l = isSUV ? 4.1 : 3.8;
+        vehicleSpeed = 75 + Math.random() * 35;
+      }
     }
 
     group.position.set(lane * this.laneWidth, 0, -260);
@@ -1076,13 +1647,14 @@ export class GameEngine {
     this.traffic.push({
       group,
       lane,
-      speed: 70 + Math.random() * 45,
+      speed: vehicleSpeed,
       isPolice,
       policeLights: lights,
       passed: false,
       cycle: 0,
       width: w,
       length: l,
+      vehicleType,
     });
   }
 
@@ -1095,7 +1667,7 @@ export class GameEngine {
     let type: CashPickup['type'] = 'cash_bundle';
     let value = 500;
 
-    if (roll < 0.45) {
+    if (roll < 0.38) {
       // ৳ 500 Bundle
       type = 'cash_bundle';
       value = 500;
@@ -1104,7 +1676,7 @@ export class GameEngine {
         new THREE.MeshStandardMaterial({ color: 0x00e676, roughness: 0.3, emissive: 0x004d20 })
       );
       group.add(bundle);
-    } else if (roll < 0.75) {
+    } else if (roll < 0.65) {
       // ৳ 200 Gold Coin
       type = 'gold_coin';
       value = 200;
@@ -1114,7 +1686,7 @@ export class GameEngine {
       );
       coin.rotation.x = Math.PI / 2;
       group.add(coin);
-    } else if (roll < 0.90) {
+    } else if (roll < 0.80) {
       // Nitro Refill
       type = 'nitro';
       value = 100;
@@ -1123,7 +1695,7 @@ export class GameEngine {
         new THREE.MeshBasicMaterial({ color: 0x00ffff })
       );
       group.add(canister);
-    } else {
+    } else if (roll < 0.90) {
       // Shield Battery
       type = 'shield';
       value = 150;
@@ -1132,6 +1704,30 @@ export class GameEngine {
         new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true })
       );
       group.add(shield);
+    } else {
+      // Police Escort Power-up (Security Patrol)
+      type = 'police_escort';
+      value = 1000;
+      const badge = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55, 0.55, 0.18, 6),
+        new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.9, roughness: 0.2 })
+      );
+      badge.rotation.x = Math.PI / 2;
+      group.add(badge);
+
+      const beacon = new THREE.Mesh(
+        new THREE.SphereGeometry(0.32, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.8 })
+      );
+      beacon.position.y = 0.25;
+      group.add(beacon);
+
+      const starRing = new THREE.Mesh(
+        new THREE.TorusGeometry(0.75, 0.08, 8, 16),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.8 })
+      );
+      starRing.rotation.x = Math.PI / 2;
+      group.add(starRing);
     }
 
     group.position.set(lane * this.laneWidth, 0.9, -240);
@@ -1398,8 +1994,31 @@ export class GameEngine {
     this.distance += forward;
     this.checkMissionProgress('distance', forward);
 
-    // Weather bonus applies to score!
-    this.score += this.speed * 0.18 * (this.isBoosting ? 2.4 : 1.0) * dt * this.combo * weather.bonusMultiplier;
+    // Security Patrol Escort & Weather bonus applies to score!
+    // Increases score multiplier during high-speed segments!
+    const isHighSpeed = this.speed >= 160 || this.isBoosting;
+    const escortScoreMultiplier = this.policeEscortTimer > 0 ? (isHighSpeed ? 3.0 : 1.8) : 1.0;
+    this.score += this.speed * 0.18 * (this.isBoosting ? 2.4 : 1.0) * dt * this.combo * weather.bonusMultiplier * escortScoreMultiplier;
+
+    // Security Patrol Police Escort Update
+    if (this.policeEscortTimer > 0) {
+      this.policeEscortTimer -= dt;
+      if (this.escortAuraMesh) {
+        this.escortAuraMesh.visible = true;
+        this.escortAuraMesh.rotation.y += dt * 5.0;
+        const flashColor = Math.floor(Date.now() / 150) % 2 === 0 ? 0x0088ff : 0xff0044;
+        (this.escortAuraMesh.material as THREE.MeshBasicMaterial).color.setHex(flashColor);
+      }
+      if (this.escortLightR && this.escortLightB) {
+        const flash = Math.floor(Date.now() / 120) % 2 === 0;
+        this.escortLightR.intensity = flash ? 3.5 : 0.2;
+        this.escortLightB.intensity = flash ? 0.2 : 3.5;
+      }
+    } else {
+      if (this.escortAuraMesh) this.escortAuraMesh.visible = false;
+      if (this.escortLightR) this.escortLightR.intensity = 0;
+      if (this.escortLightB) this.escortLightB.intensity = 0;
+    }
 
     // Combo Timer
     if (this.comboTimer > 0) {
@@ -1460,6 +2079,33 @@ export class GameEngine {
       t.position.z += roadMovement;
       if (t.position.z > 40) t.position.z -= 1300;
     });
+
+    // Dhaka Metro Rail Viaduct & Overhead Signboards scroll
+    this.metroRailPillars.forEach((p) => {
+      p.position.z += roadMovement;
+      if (p.position.z > 40) p.position.z -= 1300;
+    });
+
+    this.overheadSignboards.forEach((s) => {
+      s.position.z += roadMovement;
+      if (s.position.z > 35) s.position.z -= 1120;
+    });
+
+    // Dhaka 3D Landmarks (Parliament House, Dhaka Gate, Shaheed Minar) scroll
+    this.dhakaLandmarks.forEach((lm) => {
+      lm.position.z += roadMovement * 0.95;
+      if (lm.position.z > 140) {
+        lm.position.z -= 1350;
+      }
+    });
+
+    if (this.metroTrain) {
+      // High-speed Dhaka Metro Rail MRT-6 train gliding smoothly on the viaduct!
+      this.metroTrain.position.z += roadMovement - 26 * dt;
+      if (this.metroTrain.position.z > 80) {
+        this.metroTrain.position.z -= 1300;
+      }
+    }
 
     // Cloud drift in daytime
     if (this.cloudsGroup) {
@@ -1578,19 +2224,67 @@ export class GameEngine {
 
           sound.playNearMiss();
           this.checkMissionProgress('near_miss', 1);
-          this.onNearMissOvertake(this.combo, bonusTaka);
+          const vLabel = t.vehicleType === 'cng'
+            ? '⚡ সবুজ সিএনজি ওভারটেক!'
+            : t.vehicleType === 'bus'
+            ? '⚡ ঢাকা সিটি বাস ওভারটেক!'
+            : t.vehicleType === 'police'
+            ? '⚡ পুলিশ পেট্রোল ওভারটেক!'
+            : '⚡ রিস্কি ওভারটেক বোনাস!';
+          this.onNearMissOvertake(this.combo, bonusTaka, vLabel);
         }
       }
 
-      // Collision
-      if (this.invulnerableTimer <= 0 && cx < 1.95 && cz < 3.9) {
-        this.triggerCrash();
-        break;
+      // Collision (Protected by Security Patrol Police Escort invulnerability)
+      if (cx < 1.95 && cz < 3.9) {
+        if (this.policeEscortTimer > 0) {
+          // Police Escort: Temporary invulnerability to traffic collisions!
+          // Push traffic vehicle aside with spark burst and award bonus score
+          this.score += 600;
+          this.cameraShake = 0.25;
+          sound.playSiren();
+          t.group.position.x += t.group.position.x >= px ? 4.5 : -4.5;
+          t.speed = Math.max(35, t.speed * 0.4);
+          t.passed = true;
+          this.checkMissionProgress('near_miss', 1);
+        } else if (this.invulnerableTimer <= 0) {
+          this.triggerCrash();
+          break;
+        }
       }
 
       if (t.group.position.z > 30) {
         this.scene.remove(t.group);
         this.traffic.splice(i, 1);
+      }
+    }
+
+    // Spatial Traffic Audio & Dhaka Street Honking System
+    this.dhakaHonkTimer -= dt;
+    this.spatialAudioTimer += dt;
+    if (this.spatialAudioTimer > 0.1) {
+      this.spatialAudioTimer = 0;
+      let closestDist = 999;
+      let closestRelX = 0;
+      let closestRelZ = 0;
+      let closestType: 'bus' | 'cng' | 'police' | 'car' = 'car';
+
+      for (const t of this.traffic) {
+        const rx = t.group.position.x - px;
+        const rz = t.group.position.z - pz;
+        const dist = Math.hypot(rx, rz);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestRelX = rx;
+          closestRelZ = rz;
+          closestType = t.vehicleType || 'car';
+        }
+      }
+
+      // Traffic honks randomly as player approaches within 42m
+      if (this.dhakaHonkTimer <= 0 && closestDist < 42) {
+        sound.playDhakaTrafficHorn(closestType, closestRelX, closestRelZ);
+        this.dhakaHonkTimer = 2.4 + Math.random() * 3.6; // random interval 2.4-6s
       }
     }
 
@@ -1643,6 +2337,12 @@ export class GameEngine {
           this.shields = Math.min(this.maxShields, this.shields + 1);
           if (this.shieldMesh) this.shieldMesh.visible = true;
           this.score += 300;
+        } else if (p.type === 'police_escort') {
+          sound.playPoliceEscortPowerUp();
+          this.policeEscortTimer = 12.0;
+          this.score += 1500;
+          this.cashCollectedThisRun += finalValue;
+          this.onCashCollected(finalValue, '🚨 পুলিশ এসকর্ট সিকিউরিটি পেট্রোল সক্রিয়!');
         }
 
         this.scene.remove(p.group);
@@ -1656,7 +2356,8 @@ export class GameEngine {
       }
     }
 
-    // Broadcast stats with Dynamic Weather State
+    // Broadcast stats with Dynamic Weather & Security Patrol State
+    const escortMultiplier = this.policeEscortTimer > 0 ? (isHighSpeed ? 3.0 : 1.8) : 1.0;
     this.onStatsUpdate({
       score: Math.floor(this.score),
       distance: Math.floor(this.distance),
@@ -1668,6 +2369,9 @@ export class GameEngine {
       combo: this.combo,
       comboTimer: this.comboTimer,
       policeActive: this.policeActive,
+      policeEscortActive: this.policeEscortTimer > 0,
+      policeEscortTimer: Number(Math.max(0, this.policeEscortTimer).toFixed(1)),
+      policeEscortMultiplier: escortMultiplier,
       nearMisses: this.nearMisses,
       cashCollectedThisRun: this.cashCollectedThisRun,
       activeMission: this.missions[this.activeMissionIndex],

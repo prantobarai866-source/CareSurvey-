@@ -33,8 +33,9 @@ export interface RoadTheme {
   dirLightB: number;
   fogColor: number;
   fogDensity: number;
-  skyType: 'daytime' | 'cyber' | 'tokyo_rain' | 'sahara_sunset' | 'magma' | 'space';
+  skyType: 'daytime' | 'dhaka_city' | 'cyber' | 'tokyo_rain' | 'sahara_sunset' | 'magma' | 'space';
   weather?: 'none' | 'rain' | 'embers' | 'warp_stars';
+  hasDhakaLandmarks?: boolean;
 }
 
 export type DynamicWeatherType = 'clear' | 'rain' | 'fog' | 'neon_snow';
@@ -56,7 +57,7 @@ export interface GlobalUpgrades {
   multiplierLevel: number; // Level 1 to 5 (+20% to +100% cash earnings bonus)
 }
 
-export type PowerupType = 'cash_bundle' | 'gold_coin' | 'nitro' | 'shield' | 'magnet';
+export type PowerupType = 'cash_bundle' | 'gold_coin' | 'nitro' | 'shield' | 'magnet' | 'police_escort';
 
 export interface CashMission {
   id: string;
@@ -79,6 +80,9 @@ export interface GameStats {
   combo: number;
   comboTimer: number;
   policeActive: boolean;
+  policeEscortActive?: boolean;
+  policeEscortTimer?: number;
+  policeEscortMultiplier?: number;
   nearMisses: number;
   cashCollectedThisRun: number;
   activeMission: CashMission;

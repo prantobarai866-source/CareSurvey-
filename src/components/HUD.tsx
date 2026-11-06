@@ -7,7 +7,7 @@ interface HUDProps {
   walletBalance: number;
   isMuted: boolean;
   cashToast: { amount: number; label: string } | null;
-  nearMissToast: { combo: number; bonusTaka: number } | null;
+  nearMissToast: { combo: number; bonusTaka: number; label?: string } | null;
   onToggleSound: () => void;
   onPause: () => void;
   onOpenShop: () => void;
@@ -119,6 +119,31 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         </div>
 
+        {/* Security Patrol Police Escort Active Banner */}
+        {stats.policeEscortActive && (
+          <div className="bg-gradient-to-r from-blue-950/95 via-indigo-900/95 to-red-950/95 border-2 border-cyan-400 rounded-xl px-3.5 py-1.5 shadow-[0_0_25px_rgba(56,189,248,0.6)] flex items-center justify-between gap-2 animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="text-base sm:text-lg animate-bounce">🚨</span>
+              <div className="text-left font-mono leading-tight">
+                <div className="text-[11px] sm:text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>সিকিউরিটি পেট্রোল (POLICE ESCORT) সক্রিয়</span>
+                  <span className="hidden sm:inline text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-400/40">
+                    🛡️ সংঘর্ষ অভেদ্য
+                  </span>
+                </div>
+                <div className="text-[10px] text-amber-300 font-semibold">
+                  হাই-স্পিড ক্রুজে {stats.policeEscortMultiplier || 2.5}x অতিরিক্ত স্কোর ও ট্রাফিক ক্লিয়ারেন্স!
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="px-2.5 py-1 rounded-lg bg-black/60 border border-amber-400/50 text-amber-300 font-mono font-bold text-xs tabular-nums">
+                ⏳ {stats.policeEscortTimer}s
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sub-Bars: Nitro, Shield, Mission Contract */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-mono">
           {/* Nitro Gauge */}
@@ -205,7 +230,7 @@ export const HUD: React.FC<HUDProps> = ({
         {nearMissToast && (
           <div className="px-5 py-1.5 rounded-2xl bg-gradient-to-r from-pink-600/90 to-purple-600/90 border border-pink-400 shadow-[0_0_30px_rgba(255,0,119,0.6)] text-center animate-pulse">
             <div className="text-xs font-mono font-black text-white">
-              ⚡ রিস্কি ওভারটেক বোনাস: +৳ {nearMissToast.bonusTaka} ({nearMissToast.combo.toFixed(1)}x)
+              ⚡ {nearMissToast.label || 'রিস্কি ওভারটেক বোনাস'}: +৳ {nearMissToast.bonusTaka} ({nearMissToast.combo.toFixed(1)}x)
             </div>
           </div>
         )}
